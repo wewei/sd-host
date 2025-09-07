@@ -24,7 +24,7 @@
 
 ## API 端点详情
 
-### 1. GET /api/v1/models
+### 1. GET /api/models
 
 获取可用模型列表，支持基于元数据的高级查询和过滤。
 
@@ -52,25 +52,25 @@
 
 ```http
 # 基础查询
-GET /api/v1/models?type=checkpoint&skip=0&take=20&sort=name&order=asc
+GET /api/models?type=checkpoint&skip=0&take=20&sort=name&order=asc
 
 # 标签过滤 (使用一元布尔操作符)
-GET /api/v1/models?type=lora&tag_anime&!tag_nsfw&take=20
+GET /api/models?type=lora&tag_anime&!tag_nsfw&take=20
 
 # 大小和评分过滤
-GET /api/v1/models?size>=1000000000&rating>=4.5
+GET /api/models?size>=1000000000&rating>=4.5
 
 # 基础模型过滤
-GET /api/v1/models?type=checkpoint&base_model=SD1.5&!is_nsfw
+GET /api/models?type=checkpoint&base_model=SD1.5&!is_nsfw
 
 # 名称模糊搜索
-GET /api/v1/models?name~landscape&type=lora&tag_landscape
+GET /api/models?name~landscape&type=lora&tag_landscape
 
 # 复合查询
-GET /api/v1/models?type=checkpoint&tag_photorealistic&base_model=SDXL&is_commercial
+GET /api/models?type=checkpoint&tag_photorealistic&base_model=SDXL&is_commercial
 ```
 
-### 2. GET /api/v1/models/{model_hash}
+### 2. GET /api/models/{model_hash}
 
 获取指定模型的元数据信息。
 
@@ -98,7 +98,7 @@ GET /api/v1/models?type=checkpoint&tag_photorealistic&base_model=SDXL&is_commerc
 }
 ```
 
-### 3. GET /api/v1/models/{model_hash}/content
+### 3. GET /api/models/{model_hash}/content
 
 直接下载模型文件内容 (safetensors 格式)。
 
@@ -112,7 +112,7 @@ Content-Disposition: attachment; filename="model_name.safetensors"
 Content-Length: 4200000000
 ```
 
-### 4. POST /api/v1/models/{model_hash}
+### 4. POST /api/models/{model_hash}
 
 修改指定模型的元数据。
 
@@ -136,7 +136,7 @@ Content-Length: 4200000000
 }
 ```
 
-### 5. POST /api/v1/models
+### 5. POST /api/models
 
 批量修改多个模型的元数据。
 
@@ -169,7 +169,7 @@ Content-Length: 4200000000
 }
 ```
 
-### 6. DELETE /api/v1/models/{model_hash}
+### 6. DELETE /api/models/{model_hash}
 
 删除指定模型。
 
@@ -182,7 +182,7 @@ Content-Length: 4200000000
 }
 ```
 
-### 7. DELETE /api/v1/models
+### 7. DELETE /api/models
 
 批量删除多个模型。
 
@@ -209,7 +209,7 @@ Content-Length: 4200000000
 }
 ```
 
-### 8. POST /api/v1/models/add-from-civitai
+### 8. POST /api/models/add-from-civitai
 
 从 Civitai 添加新模型。
 
@@ -228,11 +228,11 @@ Content-Length: 4200000000
 {
   "hash": "abc123...",
   "status": "downloading",
-  "tracking_url": "/api/v1/models/add-from-civitai/abc123..."
+  "tracking_url": "/api/models/add-from-civitai/abc123..."
 }
 ```
 
-### 9. GET /api/v1/models/add-from-civitai/{model_hash}
+### 9. GET /api/models/add-from-civitai/{model_hash}
 
 SSE 实时追踪模型下载进度。
 
@@ -255,51 +255,51 @@ data: {"status": "completed", "model_info": {...}}
 **1. 获取所有可用的 Checkpoint 模型:**
 
 ```http
-GET /api/v1/models?type=checkpoint&status=ready&sort=name&order=asc
+GET /api/models?type=checkpoint&status=ready&sort=name&order=asc
 ```
 
 **2. 搜索特定风格的 LoRA 模型:**
 
 ```http
-GET /api/v1/models?type=lora&search=anime&take=20
+GET /api/models?type=lora&search=anime&take=20
 ```
 
 **3. 按标签过滤写实风格模型 (必须包含 "photorealistic" 标签):**
 
 ```http
-GET /api/v1/models?type=checkpoint&tags=photorealistic&base_model=SD1.5
+GET /api/models?type=checkpoint&tags=photorealistic&base_model=SD1.5
 ```
 
 **4. 获取动漫风格但排除成人内容的 LoRA:**
 
 ```http
-GET /api/v1/models?type=lora&tags=anime&exclude_tags=nsfw,adult&take=20
+GET /api/models?type=lora&tags=anime&exclude_tags=nsfw,adult&take=20
 ```
 
 **5. 多标签组合查询 (同时包含 "landscape" 和 "nature" 标签):**
 
 ```http
-GET /api/v1/models?tags=landscape,nature&exclude_tags=cartoon,anime
+GET /api/models?tags=landscape,nature&exclude_tags=cartoon,anime
 ```
 
 **6. 基础模型过滤 (只获取 SDXL 模型):**
 
 ```http
-GET /api/v1/models?base_model=SDXL&type=checkpoint&status=ready
+GET /api/models?base_model=SDXL&type=checkpoint&status=ready
 ```
 
 **7. 分页浏览所有模型:**
 
 ```http
-GET /api/v1/models?skip=0&take=50         # 第一页
-GET /api/v1/models?skip=50&take=50        # 第二页
-GET /api/v1/models?skip=100&take=50       # 第三页
+GET /api/models?skip=0&take=50         # 第一页
+GET /api/models?skip=50&take=50        # 第二页
+GET /api/models?skip=100&take=50       # 第三页
 ```
 
 **8. 按大小排序查找大型模型:**
 
 ```http
-GET /api/v1/models?sort=size&order=desc&take=10
+GET /api/models?sort=size&order=desc&take=10
 ```
 
 ### 性能优化建议
@@ -329,10 +329,10 @@ GET /api/v1/models?sort=size&order=desc&take=10
 
 ```http
 # 查找动漫风格的人像模型，但排除成人内容
-GET /api/v1/models?type=lora&tags=anime,portrait&exclude_tags=nsfw,adult
+GET /api/models?type=lora&tags=anime,portrait&exclude_tags=nsfw,adult
 
 # 查找写实风格模型，排除卡通和动漫风格
-GET /api/v1/models?tags=photorealistic&exclude_tags=cartoon,anime,stylized
+GET /api/models?tags=photorealistic&exclude_tags=cartoon,anime,stylized
 ```
 
 **常用标签分类:**

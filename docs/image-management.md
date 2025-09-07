@@ -13,7 +13,7 @@
 
 ## API 端点详情
 
-### 1. GET /api/v1/images
+### 1. GET /api/images
 
 查询图像，使用统一的基于元数据的过滤系统，返回图像哈希列表和元数据。
 
@@ -65,7 +65,7 @@
 }
 ```
 
-### 2. GET /api/v1/images/{image_hash}
+### 2. GET /api/images/{image_hash}
 
 获取指定图像的元数据信息。
 
@@ -96,7 +96,7 @@
 }
 ```
 
-### 3. GET /api/v1/images/{image_hash}/content
+### 3. GET /api/images/{image_hash}/content
 
 直接获取图像文件内容。
 
@@ -109,7 +109,7 @@ Content-Type: image/png
 Content-Length: 1234567
 ```
 
-### 4. POST /api/v1/images/{image_hash}
+### 4. POST /api/images/{image_hash}
 
 修改指定图像的元数据。
 
@@ -133,7 +133,7 @@ Content-Length: 1234567
 }
 ```
 
-### 5. POST /api/v1/images
+### 5. POST /api/images
 
 批量修改多个图像的元数据。
 
@@ -166,7 +166,7 @@ Content-Length: 1234567
 }
 ```
 
-### 6. DELETE /api/v1/images/{image_hash}
+### 6. DELETE /api/images/{image_hash}
 
 删除指定图像。
 
@@ -179,7 +179,7 @@ Content-Length: 1234567
 }
 ```
 
-### 7. DELETE /api/v1/images
+### 7. DELETE /api/images
 
 批量删除多个图像。
 
@@ -215,25 +215,25 @@ Content-Length: 1234567
 **1. 查找收藏的高质量图像:**
 
 ```http
-GET /api/v1/images?is_favorite&rating>=4.5&tag_high_quality
+GET /api/images?is_favorite&rating>=4.5&tag_high_quality
 ```
 
 **2. 按模型和分辨率过滤:**
 
 ```http
-GET /api/v1/images?model~stable-diffusion&width>=1024&height>=1024
+GET /api/images?model~stable-diffusion&width>=1024&height>=1024
 ```
 
 **3. 查找特定风格图像，排除成人内容:**
 
 ```http
-GET /api/v1/images?tag_landscape&tag_nature&!is_nsfw&take=50
+GET /api/images?tag_landscape&tag_nature&!is_nsfw&take=50
 ```
 
 **4. 按生成参数查询:**
 
 ```http
-GET /api/v1/images?steps>=20&cfg_scale>=7.0&!tag_nsfw
+GET /api/images?steps>=20&cfg_scale>=7.0&!tag_nsfw
 ```
 
 ### 批量操作示例
@@ -241,7 +241,7 @@ GET /api/v1/images?steps>=20&cfg_scale>=7.0&!tag_nsfw
 **批量设置评分:**
 
 ```http
-POST /api/v1/images
+POST /api/images
 {
   "abc123...": {"rating": 5.0, "tag_masterpiece": true},
   "def456...": {"rating": 4.8, "is_favorite": true}
@@ -251,7 +251,7 @@ POST /api/v1/images
 **批量删除低质量图像:**
 
 ```http
-DELETE /api/v1/images
+DELETE /api/images
 {
   "hashes": ["hash1...", "hash2...", "hash3..."]
 }

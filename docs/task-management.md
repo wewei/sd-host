@@ -13,7 +13,7 @@
 
 ## API 端点详情
 
-### 1. GET /api/v1/tasks/queue
+### 1. GET /api/tasks/queue
 
 SSE 实时推送任务队列状态。
 
@@ -40,7 +40,7 @@ SSE 实时推送任务队列状态。
 }
 ```
 
-### 2. POST /api/v1/tasks
+### 2. POST /api/tasks
 
 创建新任务，系统会自动进行智能调度。
 
@@ -77,7 +77,7 @@ SSE 实时推送任务队列状态。
 }
 ```
 
-### 3. DELETE /api/v1/tasks
+### 3. DELETE /api/tasks
 
 批量取消任务。
 
@@ -103,7 +103,7 @@ SSE 实时推送任务队列状态。
 }
 ```
 
-### 4. PUT /api/v1/tasks/priority
+### 4. PUT /api/tasks/priority
 
 批量提升任务优先级。
 

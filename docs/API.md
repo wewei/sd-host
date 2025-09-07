@@ -5,7 +5,7 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 ## API 概述
 
 - **设计原则**: RESTful 架构，JSON 数据交换
-- **API 前缀**: `/api/v1`
+- **API 前缀**: `/api`
 - **实时通信**: Server-Sent Events (SSE)
 - **目标场景**: 单用户本地部署或局域网使用
 - **查询系统**: 统一的基于元数据的查询和过滤系统
@@ -20,15 +20,15 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 
 | 方法 | 端点 | 功能描述 |
 |------|------|----------|
-| GET | `/api/v1/models` | 获取模型列表（支持元数据查询） |
-| GET | `/api/v1/models/{hash}` | 获取指定模型元数据 |
-| GET | `/api/v1/models/{hash}/content` | 下载模型文件内容 |
-| POST | `/api/v1/models/{hash}` | 修改模型元数据 |
-| POST | `/api/v1/models` | 批量修改模型元数据 |
-| DELETE | `/api/v1/models/{hash}` | 删除指定模型 |
-| DELETE | `/api/v1/models` | 批量删除模型 |
-| POST | `/api/v1/models/add-from-civitai` | 从 Civitai 添加新模型 |
-| GET | `/api/v1/models/add-from-civitai/{hash}` | SSE 追踪下载进度 |
+| GET | `/api/models` | 获取模型列表（支持元数据查询） |
+| GET | `/api/models/{hash}` | 获取指定模型元数据 |
+| GET | `/api/models/{hash}/content` | 下载模型文件内容 |
+| POST | `/api/models/{hash}` | 修改模型元数据 |
+| POST | `/api/models` | 批量修改模型元数据 |
+| DELETE | `/api/models/{hash}` | 删除指定模型 |
+| DELETE | `/api/models` | 批量删除模型 |
+| POST | `/api/models/add-from-civitai` | 从 Civitai 添加新模型 |
+| GET | `/api/models/add-from-civitai/{hash}` | SSE 追踪下载进度 |
 
 📖 **详细文档**: [Model Management API](./model-management.md)
 
@@ -40,10 +40,10 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 
 | 方法 | 端点 | 功能描述 |
 |------|------|----------|
-| GET | `/api/v1/tasks/queue` | SSE 实时推送任务队列状态 |
-| POST | `/api/v1/tasks` | 创建新任务（智能调度） |
-| DELETE | `/api/v1/tasks` | 取消任务列表（批量取消） |
-| PUT | `/api/v1/tasks/priority` | 提升任务列表优先级（批量调整） |
+| GET | `/api/tasks/queue` | SSE 实时推送任务队列状态 |
+| POST | `/api/tasks` | 创建新任务（智能调度） |
+| DELETE | `/api/tasks` | 取消任务列表（批量取消） |
+| PUT | `/api/tasks/priority` | 提升任务列表优先级（批量调整） |
 
 📖 **详细文档**: [Task Management API](./task-management.md)
 
@@ -55,13 +55,13 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 
 | 方法 | 端点 | 功能描述 |
 |------|------|----------|
-| GET | `/api/v1/images` | 获取图像列表（支持元数据查询） |
-| GET | `/api/v1/images/{hash}` | 获取指定图像元数据 |
-| GET | `/api/v1/images/{hash}/content` | 获取图像文件内容 |
-| POST | `/api/v1/images/{hash}` | 修改图像元数据 |
-| POST | `/api/v1/images` | 批量修改图像元数据 |
-| DELETE | `/api/v1/images/{hash}` | 删除指定图像 |
-| DELETE | `/api/v1/images` | 批量删除图像 |
+| GET | `/api/images` | 获取图像列表（支持元数据查询） |
+| GET | `/api/images/{hash}` | 获取指定图像元数据 |
+| GET | `/api/images/{hash}/content` | 获取图像文件内容 |
+| POST | `/api/images/{hash}` | 修改图像元数据 |
+| POST | `/api/images` | 批量修改图像元数据 |
+| DELETE | `/api/images/{hash}` | 删除指定图像 |
+| DELETE | `/api/images` | 批量删除图像 |
 
 📖 **详细文档**: [Image Management API](./image-management.md)
 
@@ -75,7 +75,7 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 
 | 方法 | 端点 | 功能描述 |
 |------|------|----------|
-| GET | `/api/v1/version` | 获取 API 版本信息 |
-| GET | `/api/v1/config` | 获取系统配置（非敏感信息） |
+| GET | `/api/version` | 获取 API 版本信息 |
+| GET | `/api/config` | 获取系统配置（非敏感信息） |
 
 📖 **详细文档**: [System Features API](./system-features.md)

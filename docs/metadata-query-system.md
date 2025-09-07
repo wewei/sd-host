@@ -167,31 +167,31 @@ SD-Host 采用统一的基于元数据的查询系统，为模型管理和图像
 **1. 查找特定类型的模型:**
 
 ```http
-GET /api/v1/models?type=checkpoint&base_model=SD1.5
+GET /api/models?type=checkpoint&base_model=SD1.5
 ```
 
 **2. 按大小范围过滤:**
 
 ```http
-GET /api/v1/models?size>=1000000000&size<=5000000000
+GET /api/models?size>=1000000000&size<=5000000000
 ```
 
 **3. 按标签组合查询 (使用一元布尔操作符):**
 
 ```http
-GET /api/v1/models?type=lora&tag_anime&!tag_nsfw
+GET /api/models?type=lora&tag_anime&!tag_nsfw
 ```
 
 **4. 高评分且允许商用的模型:**
 
 ```http
-GET /api/v1/models?rating>=4.5&is_commercial
+GET /api/models?rating>=4.5&is_commercial
 ```
 
 **5. 模糊搜索模型名称:**
 
 ```http
-GET /api/v1/models?name~landscape&type=lora&tag_landscape
+GET /api/models?name~landscape&type=lora&tag_landscape
 ```
 
 ### 图像查询示例
@@ -199,25 +199,25 @@ GET /api/v1/models?name~landscape&type=lora&tag_landscape
 **1. 查找特定模型生成的图像:**
 
 ```http
-GET /api/v1/images?model=stable-diffusion-v1-5&type=generated
+GET /api/images?model=stable-diffusion-v1-5&type=generated
 ```
 
 **2. 按分辨率过滤:**
 
 ```http
-GET /api/v1/images?width>=1024&height>=1024
+GET /api/images?width>=1024&height>=1024
 ```
 
 **3. 收藏的高质量图像:**
 
 ```http
-GET /api/v1/images?is_favorite&rating>=4.0&tag_high_quality
+GET /api/images?is_favorite&rating>=4.0&tag_high_quality
 ```
 
 **4. 包含特定标签但排除成人内容:**
 
 ```http
-GET /api/v1/images?type=generated&tag_portrait&!is_nsfw
+GET /api/images?type=generated&tag_portrait&!is_nsfw
 ```
 
 ---
@@ -228,26 +228,26 @@ GET /api/v1/images?type=generated&tag_portrait&!is_nsfw
 
 ```http
 # 查找高质量的动漫风格LoRA模型，排除成人内容
-GET /api/v1/models?type=lora&tag_anime&!is_nsfw&rating>=4.0
+GET /api/models?type=lora&tag_anime&!is_nsfw&rating>=4.0
 
 # 查找使用特定模型生成的高分辨率收藏图像
-GET /api/v1/images?model~stable-diffusion&width>=1024&is_favorite
+GET /api/images?model~stable-diffusion&width>=1024&is_favorite
 
 # 查找支持多种分辨率的写实风格Checkpoint
-GET /api/v1/models?type=checkpoint&tag_photorealistic&supports_512x512&supports_1024x1024
+GET /api/models?type=checkpoint&tag_photorealistic&supports_512x512&supports_1024x1024
 
 # 查找使用了风景LoRA的高评分图像，排除成人内容
-GET /api/v1/images?lora_landscape&rating>=4.5&tag_landscape&!is_nsfw
+GET /api/images?lora_landscape&rating>=4.5&tag_landscape&!is_nsfw
 ```
 
 ### 分页和排序
 
 ```http
 # 按评分降序排列，分页显示
-GET /api/v1/models?@type=checkpoint&sort=#rating&order=desc&skip=0&take=20
+GET /api/models?@type=checkpoint&sort=#rating&order=desc&skip=0&take=20
 
 # 按创建时间排序
-GET /api/v1/images?sort=created_at&order=desc&skip=50&take=25
+GET /api/images?sort=created_at&order=desc&skip=50&take=25
 ```
 
 ### 性能优化建议

@@ -12,7 +12,7 @@
 
 ## API 端点详情
 
-### 1. GET /api/v1/version
+### 1. GET /api/version
 
 获取 API 版本信息和系统版本。
 
@@ -31,7 +31,7 @@
 }
 ```
 
-### 2. GET /api/v1/config
+### 2. GET /api/config
 
 获取系统配置信息（不包含敏感信息）。
 
@@ -75,7 +75,7 @@
 客户端可以使用版本 API 来验证兼容性：
 
 ```javascript
-const response = await fetch('/api/v1/version');
+const response = await fetch('/api/version');
 const version = await response.json();
 if (version.api_version !== '1.0.0') {
   console.warn('API version mismatch');
@@ -87,7 +87,7 @@ if (version.api_version !== '1.0.0') {
 获取当前系统配置来调整客户端行为：
 
 ```javascript
-const response = await fetch('/api/v1/config');
+const response = await fetch('/api/config');
 const config = await response.json();
 if (!config.features.civitai_enabled) {
   // 隐藏 Civitai 相关功能
