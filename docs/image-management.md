@@ -29,13 +29,11 @@
 
 **过滤表达式示例 ($filter):**
 
-- `type eq 'generated'` - 按图像类型过滤
-- `contains(model, 'stable-diffusion')` - 按使用的模型模糊搜索
 - `width ge 1024` - 按宽度过滤
-- `rating ge 4.0` - 按评分过滤
+- `seed eq 1234567890` - 按随机种子过滤
 - `tags/any(t: t eq 'landscape')` - 包含风景标签
 - `not tags/any(t: t eq 'nsfw')` - 排除成人内容标签
-- `is_favorite eq true` - 按收藏状态过滤
+- `task_id eq 'uuid-123'` - 按关联任务过滤
 
 **响应:**
 
@@ -75,25 +73,13 @@
 ```json
 {
   "hash": "abc123...",
-  "metadata": {
-    "type": "generated",
-    "model": "stable-diffusion-v1-5",
-    "prompt": "a beautiful landscape",
-    "negative_prompt": "blurry, low quality",
-    "width": 512,
-    "height": 512,
-    "steps": 20,
-    "cfg_scale": 7.0,
-    "seed": 1234567890,
-    "rating": 4.5,
-    "tag_landscape": true,
-    "tag_nature": true,
-    "tag_high_quality": true,
-    "is_favorite": true,
-    "is_public": false,
-    "is_nsfw": false,
-    "created_at": "2024-01-01T00:00:00Z"
-  }
+  "task_id": "uuid-789...",
+  "width": 512,
+  "height": 512,
+  "size": 1024000,
+  "seed": 1234567890,
+  "created_at": "2024-01-01T00:00:00Z",
+  "tags": ["landscape", "nature", "high_quality"]
 }
 ```
 

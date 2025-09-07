@@ -54,7 +54,7 @@ SD-Host 采用基于 OData 标准的实体查询协议，为模型管理和图�
 - `size ge 1000000000` - 大于等于
 - `size lt 5000000000` - 小于  
 - `size le 5000000000` - 小于等于
-- `rating eq 4.5` - 等于
+- `width eq 1024` - 等于
 
 **字符串操作:**
 
@@ -62,10 +62,10 @@ SD-Host 采用基于 OData 标准的实体查询协议，为模型管理和图�
 - `startswith(name, 'stable')` - 以指定字符串开头
 - `endswith(name, 'v1-5')` - 以指定字符串结尾
 
-**布尔操作:**
+**基于标签的查询:**
 
-- `is_nsfw eq true` - 布尔值为真
-- `is_commercial eq false` - 布尔值为假
+- `tags/any(t: t eq 'nsfw')` - 包含特定标签
+- `not tags/any(t: t eq 'nsfw')` - 不包含特定标签
 
 ### 逻辑操作符
 
@@ -79,16 +79,16 @@ SD-Host 采用基于 OData 标准的实体查询协议，为模型管理和图�
 
 ```http
 # 逻辑与
-$filter=type eq 'checkpoint' and rating ge 4.5
+$filter=type eq 'checkpoint' and size ge 1000000000
 
 # 逻辑或
 $filter=type eq 'lora' or type eq 'checkpoint'
 
 # 逻辑非
-$filter=not (is_nsfw eq true)
+$filter=not tags/any(t: t eq 'nsfw')
 
 # 复合条件
-$filter=type eq 'checkpoint' and (rating ge 4.5 or download_count gt 100000)
+$filter=type eq 'checkpoint' and (tags/any(t: t eq 'high_quality') or tags/any(t: t eq 'popular'))
 ```
 
 ### 标签查询扩展
@@ -127,18 +127,12 @@ $filter=tags/any(t: t eq 'photorealistic') and not tags/any(t: t eq 'nsfw')
   "type": "checkpoint",             // 模型类型
   "base_model": "SD1.5",           // 基础模型架构
   "size": 4200000000,              // 文件大小 (字节)
-  "version": "1.5",                // 版本号
-  "source": "civitai",             // 来源平台
-  "resolution": 512,               // 支持分辨率
-  "download_count": 150000,        // 下载次数
-  "rating": 4.8,                   // 评分 (1-5)
+  "sourceUrl": "https://civitai.com/models/...", // 下载来源URL
+  "metadata": "{\"resolution\": 512, \"trigger_words\": [\"masterpiece\"], \"training_epochs\": 100}", // 模型参数信息 (JSON)
+  "description": "# Stable Diffusion v1.5\n\n这是一个通用的文生图模型...", // 模型描述 (Markdown)
+  "cover_image_hash": "def456...",  // 封面图像哈希 (可选)
   "created_at": "2024-01-01T00:00:00Z",
-  "updated_at": "2024-01-01T00:00:00Z",
-  
-  // 布尔属性
-  "is_nsfw": false,                // 是否成人内容
-  "is_commercial": true,           // 是否允许商用
-  "requires_trigger": false        // 是否需要触发词
+  "updated_at": "2024-01-01T00:00:00Z"
 }
 ```
 
@@ -171,27 +165,12 @@ $filter=tags/any(t: t eq 'photorealistic') and not tags/any(t: t eq 'nsfw')
 ```json
 {
   "hash": "def456...",              // SHA256 哈希 (唯一标识)
-  "type": "generated",              // 图像类型
-  "model": "stable-diffusion-v1-5", // 使用的模型
+  "task_id": "uuid-123...",         // 关联任务ID (可选，间接关联模型)
   "width": 512,                     // 宽度
   "height": 512,                    // 高度
   "size": 1024000,                  // 文件大小 (字节)
-  "format": "png",                  // 文件格式
-  "rating": 4.5,                    // 用户评分
-  "created_at": "2024-01-01T00:00:00Z",
-  
-  // 生成参数 (generated 类型特有)
-  "prompt": "a beautiful landscape",
-  "negative_prompt": "blurry, low quality",
-  "sampler": "DPM++ 2M Karras",
-  "steps": 20,
-  "cfg_scale": 7.0,
-  "seed": 1234567890,
-  
-  // 布尔属性
-  "is_favorite": true,              // 是否收藏
-  "is_public": false,               // 是否公开
-  "is_nsfw": false                  // 是否成人内容
+  "seed": 1234567890,               // 随机种子
+  "created_at": "2024-01-01T00:00:00Z"
 }
 ```
 
@@ -213,6 +192,47 @@ $filter=tags/any(t: t eq 'photorealistic') and not tags/any(t: t eq 'nsfw')
     
     // 特殊标签
     "nsfw", "favorite", "wallpaper"
+  ]
+}
+```
+
+### 任务核心属性 (Properties)
+
+任务包含生成参数，图像通过 task_id 关联到任务获取生成信息：
+
+```json
+{
+  "id": "uuid-123...",              // 任务唯一标识 (UUID)
+  "status": "completed",            // 任务状态 (pending, completed, failed, cancelled)
+  "checkpoint_hash": "abc123...",   // 主模型 (Checkpoint)
+  
+  // 生成参数
+  "prompt": "a beautiful landscape, masterpiece, high quality",
+  "negative_prompt": "blurry, low quality, worst quality",
+  "width": 768,
+  "height": 768,
+  "seed": 1234567890,
+  "steps": 30,
+  "cfg_scale": 8.0,
+  "sampler": "DPM++ 2M Karras",
+  "batch_size": 4,
+  "vae_hash": "vae456...",          // VAE 模型 (可选)
+  
+  // 时间戳
+  "created_at": "2024-01-01T00:00:00Z",
+  "promoted_at": "2024-01-01T00:05:00Z",
+  "completed_at": "2024-01-01T00:05:45Z",
+  
+  // 关联的非 checkpoint 模型
+  "additional_models": [
+    {
+      "model_hash": "lora123...",
+      "weight": 0.8
+    },
+    {
+      "model_hash": "controlnet456...",
+      "weight": 1.0
+    }
   ]
 }
 ```
@@ -256,20 +276,20 @@ GET /api/models?$filter=tags/any(t: t eq 'photorealistic') and not tags/any(t: t
 
 ```http
 # 高质量动漫风格LoRA，排除成人内容
-GET /api/models?$filter=type eq 'lora' and tags/any(t: t eq 'anime') and not tags/any(t: t eq 'nsfw') and rating ge 4.0
+GET /api/models?$filter=type eq 'lora' and tags/any(t: t eq 'anime') and not tags/any(t: t eq 'nsfw') and tags/any(t: t eq 'high_quality')
 
-# 大型写实风格Checkpoint，允许商用
-GET /api/models?$filter=type eq 'checkpoint' and tags/any(t: t eq 'photorealistic') and size ge 2000000000 and is_commercial eq true
+# 大型写实风格Checkpoint
+GET /api/models?$filter=type eq 'checkpoint' and tags/any(t: t eq 'photorealistic') and size ge 2000000000 and tags/any(t: t eq 'commercial')
 ```
 
 **4. 分页和排序:**
 
 ```http
-# 按评分降序，分页显示
-GET /api/models?$filter=type eq 'checkpoint'&$orderby=rating desc&$top=20&$skip=0
+# 按创建时间降序，分页显示
+GET /api/models?$filter=type eq 'checkpoint'&$orderby=created_at desc&$top=20&$skip=0
 
 # 多字段排序
-GET /api/models?$orderby=type asc, rating desc, created_at desc&$top=50
+GET /api/models?$orderby=type asc, size desc, created_at desc&$top=50
 ```
 
 ### 图像查询示例
@@ -278,13 +298,13 @@ GET /api/models?$orderby=type asc, rating desc, created_at desc&$top=50
 
 ```http
 # 基础过滤
-GET /api/images?$filter=type eq 'generated' and contains(model, 'stable-diffusion')
+GET /api/images?$filter=task_id ne null
 
 # 分辨率过滤
-GET /api/images?$filter=width ge 1024 and height ge 1024 and rating ge 4.0
+GET /api/images?$filter=width ge 1024 and height ge 1024 and tags/any(t: t eq 'high_quality')
 
-# 收藏状态过滤
-GET /api/images?$filter=is_favorite eq true and is_nsfw eq false
+# 种子过滤
+GET /api/images?$filter=seed eq 1234567890
 ```
 
 **2. 标签查询:**

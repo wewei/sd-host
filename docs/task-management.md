@@ -48,19 +48,25 @@ SSE 实时推送任务队列状态。
 
 ```json
 {
-  "model": "stable-diffusion-v1-5",
-  "prompt": "a beautiful landscape",
-  "negative_prompt": "blurry, low quality",
-  "width": 512,
-  "height": 512,
-  "steps": 20,
-  "cfg_scale": 7.0,
+  "checkpoint_hash": "abc123...",
+  "prompt": "a beautiful landscape, masterpiece, high quality",
+  "negative_prompt": "blurry, low quality, worst quality",
+  "width": 768,
+  "height": 768,
+  "steps": 30,
+  "cfg_scale": 8.0,
   "seed": -1,
-  "batch_size": 1,
-  "loras": [
+  "batch_size": 4,
+  "sampler": "DPM++ 2M Karras",
+  "vae_hash": "vae456...",
+  "additional_models": [
     {
-      "name": "landscape_lora",
+      "model_hash": "lora123...",
       "weight": 0.8
+    },
+    {
+      "model_hash": "controlnet456...",
+      "weight": 1.0
     }
   ]
 }
@@ -103,16 +109,15 @@ SSE 实时推送任务队列状态。
 }
 ```
 
-### 4. PUT /api/tasks/priority
+### 4. PUT /api/tasks/promote
 
-批量提升任务优先级。
+批量提升任务执行优先级。
 
 **请求参数:**
 
 ```json
 {
-  "task_ids": ["task_124", "task_125"],
-  "priority": "high"
+  "task_ids": ["task_124", "task_125"]
 }
 ```
 

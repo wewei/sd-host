@@ -82,20 +82,15 @@ GET /api/models?$filter=type eq 'checkpoint' and tags/any(t: t eq 'photorealisti
   "hash": "abc123...",
   "name": "stable-diffusion-v1-5",
   "type": "checkpoint",
+  "base_model": "SD1.5",
   "size": 4200000000,
+  "sourceUrl": "https://civitai.com/models/...",
+  "metadata": "{\"resolution\": \"512x512\", \"trigger_words\": [\"masterpiece\"], \"training_epochs\": 100}",
+  "description": "# Stable Diffusion v1.5\n\n这是一个通用的文生图模型，适合生成各种风格的图像。\n\n## 使用建议\n- 推荐分辨率：512x512\n- CFG Scale：7-12\n- 采样步数：20-50",
+  "cover_image_hash": "def456...",
   "status": "ready",
   "created_at": "2024-01-01T00:00:00Z",
-  "metadata": {
-    "base_model": "SD1.5",
-    "resolution": "512x512",
-    "source": "civitai",
-    "version": "1.5",
-    "tag_photorealistic": true,
-    "tag_general": true,
-    "tag_portrait": true,
-    "tag_nsfw": false,
-    "is_commercial": true
-  }
+  "tags": ["photorealistic", "general", "portrait", "commercial"]
 }
 ```
 

@@ -45,7 +45,7 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 | GET | `/api/tasks/queue` | SSE 实时推送任务队列状态 |
 | POST | `/api/tasks` | 创建新任务（智能调度） |
 | DELETE | `/api/tasks` | 取消任务列表（批量取消） |
-| PUT | `/api/tasks/priority` | 提升任务列表优先级（批量调整） |
+| PUT | `/api/tasks/promote` | 提升任务列表执行优先级（批量提升） |
 
 📖 **详细文档**: [Task Management API](./task-management.md)
 
