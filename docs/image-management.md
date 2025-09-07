@@ -6,94 +6,35 @@
 
 - **唯一标识**: 所有图像使用文件内容的哈希值作为唯一标识符（SHA256）
 - **自动去重**: 天然实现图像去重，相同内容的图像共享同一个 ID
-- **元数据系统**: 使用基于属性的 metadata 系统，支持多种数据类型
-- **类型安全**: 使用前缀约定来区分数据类型，避免类型冲突
-
-## Metadata 类型系统
-
-### 数据类型前缀约定
-
-| 前缀 | 数据类型 | 示例 | 默认值 |
-|------|----------|------|---------|
-| `@` | string | `@type: "realistic"` | `""` (空字符串) |
-| `#` | number | `#rating: 4.5` | `0` |
-| `*` | set | `*tags: ["tag1", "tag2"]` | `[]` (空集合) |
-| `?` | boolean | `?is_favorite: true` | `false` |
-
-### Metadata 示例
-
-```json
-{
-  "@type": "generated",
-  "@model": "stable-diffusion-v1-5",
-  "@style": "realistic",
-  "#resolution": 512,
-  "#rating": 4.5,
-  "#steps": 20,
-  "*tags": ["landscape", "high-quality", "AI"],
-  "*loras": ["lora1", "lora2"],
-  "?is_favorite": true,
-  "?is_public": false,
-  "?is_nsfw": false
-}
-```
+- **统一API**: 与模型管理API保持完全一致的设计模式
+- **元数据系统**: 使用统一的查询语法，支持类型推断
 
 ---
 
 ## API 端点详情
 
-### 1. GET /api/v1/images/{image_hash}
+### 1. GET /api/v1/images
 
-获取图像数据，直接返回图像文件内容。
+查询图像，使用统一的基于元数据的过滤系统，返回图像哈希列表和元数据。
 
-**响应:** 直接返回图像文件（PNG/JPEG/WebP 等格式）
+📖 **查询语法详细说明**: [元数据查询系统](./metadata-query-system.md)
 
-**Headers:**
-```
-Content-Type: image/png
-Content-Length: 1234567
-```
+**基础查询参数:**
 
-### 2. POST /api/v1/images/{image_hash}/metadata
+- `skip` - 跳过记录数 (分页偏移，默认 0)
+- `take` - 获取记录数 (分页大小，默认 50，最大 200)
+- `sort` - 排序字段 (支持任何元数据字段，默认 `created_at`)
+- `order` - 排序顺序 (`asc`, `desc`, 默认 `desc`)
 
-为图像设置元数据属性。新属性会覆盖同类型旧属性。
+**元数据过滤示例:**
 
-**请求参数:**
-
-```json
-{
-  "@style": "photorealistic",
-  "#rating": 4.8,
-  "*tags": ["portrait", "high-quality"],
-  "?is_favorite": true
-}
-```
-
-**响应:**
-
-```json
-{
-  "success": true,
-  "updated_metadata": {
-    "@style": "photorealistic",
-    "#rating": 4.8,
-    "*tags": ["portrait", "high-quality"],
-    "?is_favorite": true
-  }
-}
-```
-
-### 3. GET /api/v1/images
-
-查询图像，按属性过滤，返回图像哈希列表和元数据。
-
-**查询参数:**
-- `@type=generated` - 字符串类型过滤
-- `#rating>=4.0` - 数字类型范围过滤
-- `*tags=landscape` - 集合类型包含过滤
-- `?is_favorite=true` - 布尔类型过滤
-- `limit=20` - 限制返回数量
-- `offset=0` - 分页偏移
+- `type=generated` - 按图像类型过滤
+- `model~stable-diffusion` - 按使用的模型模糊搜索
+- `width>=1024` - 按宽度过滤
+- `rating>=4.0` - 按评分过滤
+- `tag_landscape` - 包含风景标签 (布尔真值)
+- `!tag_nsfw` - 排除成人内容标签 (布尔假值)
+- `is_favorite` - 按收藏状态过滤 (布尔真值)
 
 **响应:**
 
@@ -103,40 +44,150 @@ Content-Length: 1234567
     {
       "hash": "abc123...",
       "metadata": {
-        "@type": "generated",
-        "@model": "stable-diffusion-v1-5",
-        "#rating": 4.5,
-        "*tags": ["landscape", "high-quality"],
-        "?is_favorite": true
+        "type": "generated",
+        "model": "stable-diffusion-v1-5",
+        "width": 512,
+        "height": 512,
+        "rating": 4.5,
+        "tag_landscape": true,
+        "tag_high_quality": true,
+        "is_favorite": true,
+        "is_nsfw": false
       }
     }
   ],
-  "total": 156,
-  "limit": 20,
-  "offset": 0
-}
-```
-
-### 4. DELETE /api/v1/images
-
-删除图像，支持按哈希列表或元数据属性条件批量删除。
-
-**按哈希删除:**
-
-```json
-{
-  "hashes": ["abc123...", "def456..."]
-}
-```
-
-**按条件删除:**
-
-```json
-{
-  "conditions": {
-    "#rating": {"<": 2.0},
-    "?is_public": false
+  "pagination": {
+    "total": 156,
+    "skip": 0,
+    "take": 20,
+    "has_more": true
   }
+}
+```
+
+### 2. GET /api/v1/images/{image_hash}
+
+获取指定图像的元数据信息。
+
+**响应:**
+
+```json
+{
+  "hash": "abc123...",
+  "metadata": {
+    "type": "generated",
+    "model": "stable-diffusion-v1-5",
+    "prompt": "a beautiful landscape",
+    "negative_prompt": "blurry, low quality",
+    "width": 512,
+    "height": 512,
+    "steps": 20,
+    "cfg_scale": 7.0,
+    "seed": 1234567890,
+    "rating": 4.5,
+    "tag_landscape": true,
+    "tag_nature": true,
+    "tag_high_quality": true,
+    "is_favorite": true,
+    "is_public": false,
+    "is_nsfw": false,
+    "created_at": "2024-01-01T00:00:00Z"
+  }
+}
+```
+
+### 3. GET /api/v1/images/{image_hash}/content
+
+直接获取图像文件内容。
+
+**响应:** 直接返回图像文件（PNG/JPEG/WebP 等格式）
+
+**Headers:**
+
+```http
+Content-Type: image/png
+Content-Length: 1234567
+```
+
+### 4. POST /api/v1/images/{image_hash}
+
+修改指定图像的元数据。
+
+**请求参数:**
+
+```json
+{
+  "rating": 4.8,
+  "tag_masterpiece": true,
+  "is_favorite": true,
+  "custom_note": "Beautiful composition"
+}
+```
+
+**响应:**
+
+```json
+{
+  "success": true,
+  "updated_fields": ["rating", "tag_masterpiece", "is_favorite", "custom_note"]
+}
+```
+
+### 5. POST /api/v1/images
+
+批量修改多个图像的元数据。
+
+**请求参数:**
+
+```json
+{
+  "abc123...": {
+    "rating": 4.8,
+    "is_favorite": true
+  },
+  "def456...": {
+    "tag_masterpiece": true,
+    "is_public": true
+  }
+}
+```
+
+**响应:**
+
+```json
+{
+  "success": ["abc123...", "def456..."],
+  "failed": [
+    {
+      "hash": "ghi789...",
+      "error": "Image not found"
+    }
+  ]
+}
+```
+
+### 6. DELETE /api/v1/images/{image_hash}
+
+删除指定图像。
+
+**响应:**
+
+```json
+{
+  "success": true,
+  "message": "Image deleted successfully"
+}
+```
+
+### 7. DELETE /api/v1/images
+
+批量删除多个图像。
+
+**请求参数:**
+
+```json
+{
+  "hashes": ["abc123...", "def456...", "ghi789..."]
 }
 ```
 
@@ -155,19 +206,53 @@ Content-Length: 1234567
 }
 ```
 
-## 高级查询语法
+---
 
-### 数字类型查询
-- `#rating=4.5` - 等于
-- `#rating>=4.0` - 大于等于
-- `#rating<3.0` - 小于
-- `#steps=20,25,30` - 多值匹配
+## 元数据查询示例
 
-### 集合类型查询
-- `*tags=landscape` - 包含标签
-- `*tags=landscape,portrait` - 包含任一标签
-- `*tags=landscape&portrait` - 同时包含多个标签
+### 常见查询场景
 
-### 字符串类型查询
-- `@model=stable-diffusion-v1-5` - 精确匹配
-- `@style=realistic,photorealistic` - 多值匹配
+**1. 查找收藏的高质量图像:**
+
+```http
+GET /api/v1/images?is_favorite&rating>=4.5&tag_high_quality
+```
+
+**2. 按模型和分辨率过滤:**
+
+```http
+GET /api/v1/images?model~stable-diffusion&width>=1024&height>=1024
+```
+
+**3. 查找特定风格图像，排除成人内容:**
+
+```http
+GET /api/v1/images?tag_landscape&tag_nature&!is_nsfw&take=50
+```
+
+**4. 按生成参数查询:**
+
+```http
+GET /api/v1/images?steps>=20&cfg_scale>=7.0&!tag_nsfw
+```
+
+### 批量操作示例
+
+**批量设置评分:**
+
+```http
+POST /api/v1/images
+{
+  "abc123...": {"rating": 5.0, "tag_masterpiece": true},
+  "def456...": {"rating": 4.8, "is_favorite": true}
+}
+```
+
+**批量删除低质量图像:**
+
+```http
+DELETE /api/v1/images
+{
+  "hashes": ["hash1...", "hash2...", "hash3..."]
+}
+```

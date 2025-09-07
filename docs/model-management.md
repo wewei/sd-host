@@ -8,6 +8,17 @@
 - **智能查询**: 单一 API 处理模型信息查询和下载进度追踪
 - **实时追踪**: 支持 Server-Sent Events (SSE) 实时进度追踪
 - **Civitai 集成**: 专用 API 从 Civitai 平台下载模型
+- **多类型支持**: 支持 Checkpoint、LoRA、ControlNet、VAE、Embedding 等模型类型
+
+## 支持的模型类型
+
+| 类型 | 描述 | 典型用途 | 文件扩展名 |
+|------|------|----------|------------|
+| `checkpoint` | 基础模型检查点 | 主要生成模型 | `.safetensors`, `.ckpt` |
+| `lora` | 低秩适应模型 | 风格调节、特定对象 | `.safetensors` |
+| `controlnet` | 控制网络模型 | 姿态控制、边缘检测 | `.safetensors` |
+| `vae` | 变分自编码器 | 图像质量优化 | `.safetensors`, `.pt` |
+| `embedding` | 文本嵌入模型 | 负面提示、风格词 | `.pt`, `.bin` |
 
 ---
 
@@ -15,65 +26,195 @@
 
 ### 1. GET /api/v1/models
 
-获取所有可用模型列表。
+获取可用模型列表，支持基于元数据的高级查询和过滤。
 
-**响应格式:**
+📖 **查询语法详细说明**: [元数据查询系统](./metadata-query-system.md)
+
+**基础查询参数:**
+
+- `skip` - 跳过记录数 (分页偏移，默认 0)
+- `take` - 获取记录数 (分页大小，默认 50，最大 200)
+- `sort` - 排序字段 (支持任何元数据字段，默认 `created_at`)
+- `order` - 排序顺序 (`asc`, `desc`, 默认 `desc`)
+
+**元数据过滤 (使用统一查询语法):**
+
+- `type=checkpoint` - 按模型类型过滤
+- `base_model=SD1.5` - 按基础模型过滤
+- `name~landscape` - 按名称模糊搜索
+- `size>=1000000000` - 按文件大小范围过滤
+- `rating>=4.5` - 按评分过滤
+- `tag_anime` - 包含动漫标签 (布尔真值)
+- `!tag_nsfw` - 排除成人内容标签 (布尔假值)
+- `is_commercial` - 按商用许可过滤 (布尔真值)
+
+**请求示例:**
+
+```http
+# 基础查询
+GET /api/v1/models?type=checkpoint&skip=0&take=20&sort=name&order=asc
+
+# 标签过滤 (使用一元布尔操作符)
+GET /api/v1/models?type=lora&tag_anime&!tag_nsfw&take=20
+
+# 大小和评分过滤
+GET /api/v1/models?size>=1000000000&rating>=4.5
+
+# 基础模型过滤
+GET /api/v1/models?type=checkpoint&base_model=SD1.5&!is_nsfw
+
+# 名称模糊搜索
+GET /api/v1/models?name~landscape&type=lora&tag_landscape
+
+# 复合查询
+GET /api/v1/models?type=checkpoint&tag_photorealistic&base_model=SDXL&is_commercial
+```
+
+### 2. GET /api/v1/models/{model_hash}
+
+获取指定模型的元数据信息。
+
+**响应:**
+
 ```json
 {
-  "models": [
+  "hash": "abc123...",
+  "name": "stable-diffusion-v1-5",
+  "type": "checkpoint",
+  "size": 4200000000,
+  "status": "ready",
+  "created_at": "2024-01-01T00:00:00Z",
+  "metadata": {
+    "base_model": "SD1.5",
+    "resolution": "512x512",
+    "source": "civitai",
+    "version": "1.5",
+    "tag_photorealistic": true,
+    "tag_general": true,
+    "tag_portrait": true,
+    "tag_nsfw": false,
+    "is_commercial": true
+  }
+}
+```
+
+### 3. GET /api/v1/models/{model_hash}/content
+
+直接下载模型文件内容 (safetensors 格式)。
+
+**响应:** 直接返回模型文件内容
+
+**Headers:**
+
+```http
+Content-Type: application/octet-stream
+Content-Disposition: attachment; filename="model_name.safetensors"
+Content-Length: 4200000000
+```
+
+### 4. POST /api/v1/models/{model_hash}
+
+修改指定模型的元数据。
+
+**请求参数:**
+
+```json
+{
+  "tag_high_quality": true,
+  "rating": 4.8,
+  "is_favorite": true,
+  "custom_note": "Updated description"
+}
+```
+
+**响应:**
+
+```json
+{
+  "success": true,
+  "updated_fields": ["tag_high_quality", "rating", "is_favorite", "custom_note"]
+}
+```
+
+### 5. POST /api/v1/models
+
+批量修改多个模型的元数据。
+
+**请求参数:**
+
+```json
+{
+  "abc123...": {
+    "tag_high_quality": true,
+    "rating": 4.8
+  },
+  "def456...": {
+    "is_favorite": true,
+    "tag_anime": true
+  }
+}
+```
+
+**响应:**
+
+```json
+{
+  "success": ["abc123...", "def456..."],
+  "failed": [
     {
-      "sha256": "abc123...",
-      "name": "stable-diffusion-v1-5",
-      "size": "4.2GB",
-      "status": "ready",
-      "created_at": "2024-01-01T00:00:00Z"
+      "hash": "ghi789...",
+      "error": "Model not found"
     }
   ]
 }
 ```
 
-### 2. GET /api/v1/models/{model_sha256}
+### 6. DELETE /api/v1/models/{model_hash}
 
-智能获取模型信息，根据模型状态返回不同内容。
+删除指定模型。
 
-**返回场景:**
+**响应:**
 
-| 模型状态 | HTTP 状态码 | 返回方式 | 说明 |
-|----------|-------------|----------|------|
-| 不存在 | 404 Not Found | JSON | 模型未找到 |
-| 下载中 | 200 OK | SSE Stream | 保持连接，实时推送下载进度 |
-| 已完成 | 200 OK | JSON | 立即返回完整模型信息 |
-
-**SSE 下载进度示例:**
-```
-data: {"status": "downloading", "progress": 45.2, "speed": "2.3MB/s", "eta": "00:02:30"}
-
-data: {"status": "downloading", "progress": 67.8, "speed": "2.1MB/s", "eta": "00:01:45"}
-
-data: {"status": "completed", "model_info": {...}}
-```
-
-**完成状态响应:**
 ```json
 {
-  "sha256": "abc123...",
-  "name": "stable-diffusion-v1-5",
-  "size": "4.2GB",
-  "status": "ready",
-  "path": "/models/stable-diffusion-v1-5",
-  "metadata": {
-    "source": "civitai",
-    "version": "1.5",
-    "description": "..."
-  }
+  "success": true,
+  "message": "Model deleted successfully"
 }
 ```
 
-### 3. POST /api/v1/models/add-from-civitai
+### 7. DELETE /api/v1/models
+
+批量删除多个模型。
+
+**请求参数:**
+
+```json
+{
+  "hashes": ["abc123...", "def456...", "ghi789..."]
+}
+```
+
+**响应:**
+
+```json
+{
+  "deleted": ["abc123...", "def456..."],
+  "failed": [
+    {
+      "hash": "ghi789...",
+      "reason": "Model in use by active task"
+    }
+  ],
+  "count": 2
+}
+```
+
+### 8. POST /api/v1/models/add-from-civitai
 
 从 Civitai 添加新模型。
 
 **请求参数:**
+
 ```json
 {
   "model_id": "4201",
@@ -82,22 +223,135 @@ data: {"status": "completed", "model_info": {...}}
 ```
 
 **响应:**
+
 ```json
 {
-  "sha256": "abc123...",
+  "hash": "abc123...",
   "status": "downloading",
-  "tracking_url": "/api/v1/models/abc123..."
+  "tracking_url": "/api/v1/models/add-from-civitai/abc123..."
 }
 ```
 
-### 4. DELETE /api/v1/models/{model_sha256}
+### 9. GET /api/v1/models/add-from-civitai/{model_hash}
 
-删除指定模型。
+SSE 实时追踪模型下载进度。
 
-**响应:**
+**SSE 下载进度示例:**
+
+```json
+data: {"status": "downloading", "progress": 45.2, "speed": "2.3MB/s", "eta": "00:02:30"}
+
+data: {"status": "downloading", "progress": 67.8, "speed": "2.1MB/s", "eta": "00:01:45"}
+
+data: {"status": "completed", "model_info": {...}}
+```
+
+---
+
+## 查询示例和最佳实践
+
+### 常见查询场景
+
+**1. 获取所有可用的 Checkpoint 模型:**
+
+```http
+GET /api/v1/models?type=checkpoint&status=ready&sort=name&order=asc
+```
+
+**2. 搜索特定风格的 LoRA 模型:**
+
+```http
+GET /api/v1/models?type=lora&search=anime&take=20
+```
+
+**3. 按标签过滤写实风格模型 (必须包含 "photorealistic" 标签):**
+
+```http
+GET /api/v1/models?type=checkpoint&tags=photorealistic&base_model=SD1.5
+```
+
+**4. 获取动漫风格但排除成人内容的 LoRA:**
+
+```http
+GET /api/v1/models?type=lora&tags=anime&exclude_tags=nsfw,adult&take=20
+```
+
+**5. 多标签组合查询 (同时包含 "landscape" 和 "nature" 标签):**
+
+```http
+GET /api/v1/models?tags=landscape,nature&exclude_tags=cartoon,anime
+```
+
+**6. 基础模型过滤 (只获取 SDXL 模型):**
+
+```http
+GET /api/v1/models?base_model=SDXL&type=checkpoint&status=ready
+```
+
+**7. 分页浏览所有模型:**
+
+```http
+GET /api/v1/models?skip=0&take=50         # 第一页
+GET /api/v1/models?skip=50&take=50        # 第二页
+GET /api/v1/models?skip=100&take=50       # 第三页
+```
+
+**8. 按大小排序查找大型模型:**
+
+```http
+GET /api/v1/models?sort=size&order=desc&take=10
+```
+
+### 性能优化建议
+
+- **分页查询**: 建议使用 `take` 参数限制返回数量，默认 50 条，最大 200 条
+- **类型过滤**: 优先使用 `type` 参数过滤，可显著减少查询时间
+- **状态过滤**: 使用 `status=ready` 只获取可用模型，避免显示下载中的模型
+- **搜索优化**: `search` 参数支持模糊匹配，但建议输入至少 3 个字符
+- **标签过滤**: 标签查询支持 AND 逻辑，多个标签用逗号分隔表示必须同时包含
+- **排除标签**: 使用 `exclude_tags` 可以有效过滤不需要的内容类型
+
+### 标签过滤详细说明
+
+**正向标签过滤 (`tags`):**
+
+- 多个标签用逗号分隔，表示 AND 关系（必须同时包含）
+- 示例：`tags=anime,portrait` 表示模型必须同时有 "anime" 和 "portrait" 标签
+- 标签匹配不区分大小写
+
+**负向标签过滤 (`exclude_tags`):**
+
+- 排除包含指定标签的模型
+- 多个排除标签用逗号分隔，任意一个匹配都会被排除
+- 示例：`exclude_tags=nsfw,violence` 表示排除包含 "nsfw" 或 "violence" 标签的模型
+
+**组合使用示例:**
+
+```http
+# 查找动漫风格的人像模型，但排除成人内容
+GET /api/v1/models?type=lora&tags=anime,portrait&exclude_tags=nsfw,adult
+
+# 查找写实风格模型，排除卡通和动漫风格
+GET /api/v1/models?tags=photorealistic&exclude_tags=cartoon,anime,stylized
+```
+
+**常用标签分类:**
+
+- **风格标签**: `photorealistic`, `anime`, `cartoon`, `artistic`, `stylized`
+- **内容标签**: `portrait`, `landscape`, `character`, `object`, `architecture`
+- **质量标签**: `high-quality`, `detailed`, `professional`, `masterpiece`
+- **限制标签**: `nsfw`, `adult`, `violence`, `explicit` (通常用于排除)
+
+### 错误处理
+
+**查询参数验证错误 (400 Bad Request):**
+
 ```json
 {
-  "success": true,
-  "message": "Model deleted successfully"
+  "error": "Invalid parameter",
+  "details": {
+    "type": "Invalid model type. Allowed: checkpoint, lora, controlnet, vae, embedding",
+    "take": "Take parameter must be between 1 and 200"
+  }
 }
 ```

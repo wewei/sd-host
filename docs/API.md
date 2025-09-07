@@ -8,6 +8,9 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 - **API 前缀**: `/api/v1`
 - **实时通信**: Server-Sent Events (SSE)
 - **目标场景**: 单用户本地部署或局域网使用
+- **查询系统**: 统一的基于元数据的查询和过滤系统
+
+📖 **查询系统详细文档**: [元数据查询系统](./metadata-query-system.md)
 
 ---
 
@@ -15,14 +18,17 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 
 管理 Stable Diffusion 模型的增删查改操作。
 
-### API 端点
-
 | 方法 | 端点 | 功能描述 |
 |------|------|----------|
-| GET | `/api/v1/models` | 获取所有可用模型列表 |
-| GET | `/api/v1/models/{model_sha256}` | 智能获取模型信息（支持 SSE 下载进度） |
+| GET | `/api/v1/models` | 获取模型列表（支持元数据查询） |
+| GET | `/api/v1/models/{hash}` | 获取指定模型元数据 |
+| GET | `/api/v1/models/{hash}/content` | 下载模型文件内容 |
+| POST | `/api/v1/models/{hash}` | 修改模型元数据 |
+| POST | `/api/v1/models` | 批量修改模型元数据 |
+| DELETE | `/api/v1/models/{hash}` | 删除指定模型 |
+| DELETE | `/api/v1/models` | 批量删除模型 |
 | POST | `/api/v1/models/add-from-civitai` | 从 Civitai 添加新模型 |
-| DELETE | `/api/v1/models/{model_sha256}` | 删除指定模型 |
+| GET | `/api/v1/models/add-from-civitai/{hash}` | SSE 追踪下载进度 |
 
 📖 **详细文档**: [Model Management API](./model-management.md)
 
@@ -31,8 +37,6 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 ## 2. 任务管理类 (Task Management)
 
 调度主机资源，完成图像渲染任务。
-
-### API 端点
 
 | 方法 | 端点 | 功能描述 |
 |------|------|----------|
@@ -49,14 +53,15 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 
 管理所有类型的图像和元数据系统。
 
-### API 端点
-
 | 方法 | 端点 | 功能描述 |
 |------|------|----------|
-| GET | `/api/v1/images/{image_hash}` | 获取图像数据（直接返回图像文件内容） |
-| POST | `/api/v1/images/{image_hash}/metadata` | 为图像设置元数据属性 |
-| GET | `/api/v1/images` | 查询图像（按属性过滤） |
-| DELETE | `/api/v1/images` | 删除图像（支持批量删除） |
+| GET | `/api/v1/images` | 获取图像列表（支持元数据查询） |
+| GET | `/api/v1/images/{hash}` | 获取指定图像元数据 |
+| GET | `/api/v1/images/{hash}/content` | 获取图像文件内容 |
+| POST | `/api/v1/images/{hash}` | 修改图像元数据 |
+| POST | `/api/v1/images` | 批量修改图像元数据 |
+| DELETE | `/api/v1/images/{hash}` | 删除指定图像 |
+| DELETE | `/api/v1/images` | 批量删除图像 |
 
 📖 **详细文档**: [Image Management API](./image-management.md)
 
