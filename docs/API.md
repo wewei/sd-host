@@ -12,6 +12,8 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 
 📖 **查询协议详细文档**: [实体查询协议 (OData)](./entity-query-protocol.md)
 
+📊 **数据库设计文档**: [SQLite 数据库表结构](./database-schema.md)
+
 ---
 
 ## 1. 模型管理类 (Model Management)
