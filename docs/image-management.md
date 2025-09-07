@@ -15,9 +15,9 @@
 
 ### 1. GET /api/images
 
-查询图像，使用统一的基于元数据的过滤系统，返回图像哈希列表和元数据。
+查询图像，使用统一的实体查询协议进行过滤，返回图像哈希列表和属性。
 
-📖 **查询语法详细说明**: [元数据查询系统](./metadata-query-system.md)
+📖 **查询语法详细说明**: [实体查询协议](./entity-query-protocol.md)
 
 **基础查询参数:**
 
@@ -26,15 +26,15 @@
 - `sort` - 排序字段 (支持任何元数据字段，默认 `created_at`)
 - `order` - 排序顺序 (`asc`, `desc`, 默认 `desc`)
 
-**元数据过滤示例:**
+**属性过滤示例:**
 
 - `type=generated` - 按图像类型过滤
 - `model~stable-diffusion` - 按使用的模型模糊搜索
 - `width>=1024` - 按宽度过滤
 - `rating>=4.0` - 按评分过滤
-- `tag_landscape` - 包含风景标签 (布尔真值)
-- `!tag_nsfw` - 排除成人内容标签 (布尔假值)
-- `is_favorite` - 按收藏状态过滤 (布尔真值)
+- `tags=landscape` - 包含风景标签
+- `!tags=nsfw` - 排除成人内容标签
+- `is_favorite=true` - 按收藏状态过滤
 
 **响应:**
 

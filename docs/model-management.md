@@ -26,9 +26,9 @@
 
 ### 1. GET /api/models
 
-获取可用模型列表，支持基于元数据的高级查询和过滤。
+获取可用模型列表，支持基于实体查询协议的高级查询和过滤。
 
-📖 **查询语法详细说明**: [元数据查询系统](./metadata-query-system.md)
+📖 **查询语法详细说明**: [实体查询协议](./entity-query-protocol.md)
 
 **基础查询参数:**
 
@@ -37,16 +37,16 @@
 - `sort` - 排序字段 (支持任何元数据字段，默认 `created_at`)
 - `order` - 排序顺序 (`asc`, `desc`, 默认 `desc`)
 
-**元数据过滤 (使用统一查询语法):**
+**元数据过滤 (使用实体查询协议):**
 
 - `type=checkpoint` - 按模型类型过滤
 - `base_model=SD1.5` - 按基础模型过滤
 - `name~landscape` - 按名称模糊搜索
 - `size>=1000000000` - 按文件大小范围过滤
 - `rating>=4.5` - 按评分过滤
-- `tag_anime` - 包含动漫标签 (布尔真值)
-- `!tag_nsfw` - 排除成人内容标签 (布尔假值)
-- `is_commercial` - 按商用许可过滤 (布尔真值)
+- `tags=anime` - 包含动漫标签
+- `!tags=nsfw` - 排除成人内容标签
+- `is_commercial=true` - 按商用许可过滤
 
 **请求示例:**
 
@@ -54,20 +54,20 @@
 # 基础查询
 GET /api/models?type=checkpoint&skip=0&take=20&sort=name&order=asc
 
-# 标签过滤 (使用一元布尔操作符)
-GET /api/models?type=lora&tag_anime&!tag_nsfw&take=20
+# 标签过滤 (使用标签查询)
+GET /api/models?type=lora&tags=anime&!tags=nsfw&take=20
 
 # 大小和评分过滤
 GET /api/models?size>=1000000000&rating>=4.5
 
 # 基础模型过滤
-GET /api/models?type=checkpoint&base_model=SD1.5&!is_nsfw
+GET /api/models?type=checkpoint&base_model=SD1.5&is_nsfw=false
 
 # 名称模糊搜索
-GET /api/models?name~landscape&type=lora&tag_landscape
+GET /api/models?name~landscape&type=lora&tags=landscape
 
 # 复合查询
-GET /api/models?type=checkpoint&tag_photorealistic&base_model=SDXL&is_commercial
+GET /api/models?type=checkpoint&tags=photorealistic&base_model=SDXL&is_commercial=true
 ```
 
 ### 2. GET /api/models/{model_hash}
