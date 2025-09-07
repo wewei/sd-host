@@ -1,13 +1,13 @@
 # 实体查询协议 (Entity Query Protocol)
 
-SD-Host 采用统一的实体查询协议，为模型管理和图像管理提供一致且直观的查询和过滤能力。
+SD-Host 采用基于 OData 标准的实体查询协议，为模型管理和图像管理提供标准化且强大的查询和过滤能力。
 
 ## 设计理念
 
-- **简洁直观**: 实体属性直接查询，无需复杂的类型系统
+- **标准化**: 遵循 OData 查询标准，与业界最佳实践保持一致
 - **统一标准**: 模型和图像使用相同的查询语法
 - **清晰分离**: 核心属性 (properties) 与标签系统 (tags) 分离
-- **URL友好**: 所有语法都是URL安全的，无需特殊编码
+- **URL友好**: 符合 OData URL 编码规范
 
 ---
 
@@ -34,46 +34,85 @@ SD-Host 采用统一的实体查询协议，为模型管理和图像管理提供
 }
 ```
 
-## 查询语法
+## OData 查询语法
 
-### 属性查询操作符
+### $filter 查询表达式
 
-**字符串属性:**
+基于 OData v4 标准的 `$filter` 查询参数进行实体过滤。
 
-- `name=value` - 精确匹配
-- `name!=value` - 不等于  
-- `name~value` - 模糊匹配 (包含子字符串)
+### 比较操作符
 
-**数字属性:**
+**等值比较:**
 
-- `size=123` - 等于
-- `size!=123` - 不等于
-- `size>123` - 大于
-- `size>=123` - 大于等于
-- `size<123` - 小于
-- `size<=123` - 小于等于
+- `name eq 'stable-diffusion-v1-5'` - 精确匹配
+- `name ne 'old-model'` - 不等于
+- `type eq 'checkpoint'` - 类型匹配
 
-**布尔属性:**
+**数值比较:**
 
-- `is_nsfw=true` - 为真
-- `is_nsfw=false` - 为假
+- `size gt 1000000000` - 大于
+- `size ge 1000000000` - 大于等于
+- `size lt 5000000000` - 小于  
+- `size le 5000000000` - 小于等于
+- `rating eq 4.5` - 等于
 
-### 标签查询操作符
+**字符串操作:**
+
+- `contains(name, 'landscape')` - 包含子字符串
+- `startswith(name, 'stable')` - 以指定字符串开头
+- `endswith(name, 'v1-5')` - 以指定字符串结尾
+
+**布尔操作:**
+
+- `is_nsfw eq true` - 布尔值为真
+- `is_commercial eq false` - 布尔值为假
+
+### 逻辑操作符
+
+**组合条件:**
+
+- `and` - 逻辑与
+- `or` - 逻辑或  
+- `not` - 逻辑非
+
+**示例:**
+
+```http
+# 逻辑与
+$filter=type eq 'checkpoint' and rating ge 4.5
+
+# 逻辑或
+$filter=type eq 'lora' or type eq 'checkpoint'
+
+# 逻辑非
+$filter=not (is_nsfw eq true)
+
+# 复合条件
+$filter=type eq 'checkpoint' and (rating ge 4.5 or download_count gt 100000)
+```
+
+### 标签查询扩展
+
+虽然 OData 标准不直接支持数组查询，我们扩展了标签查询语法：
 
 **标签包含:**
 
-- `tags=landscape` - 包含指定标签
-- `tags=landscape,portrait` - 包含任一标签 (OR 关系)
+- `tags/any(t: t eq 'landscape')` - 包含指定标签
+- `tags/any(t: t eq 'anime' or t eq 'portrait')` - 包含任一标签
 
 **标签排除:**
 
-- `!tags=nsfw` - 不包含指定标签
-- `!tags=nsfw,adult` - 不包含任一指定标签
+- `not tags/any(t: t eq 'nsfw')` - 不包含指定标签
 
 **标签组合:**
 
-- `tags=anime&tags=portrait` - 同时包含多个标签 (AND 关系)
-- `tags=landscape&!tags=nsfw` - 包含指定标签但排除其他标签
+```http
+# 同时包含多个标签
+$filter=tags/any(t: t eq 'anime') and tags/any(t: t eq 'portrait')
+
+# 包含指定标签但排除其他标签
+$filter=tags/any(t: t eq 'photorealistic') and not tags/any(t: t eq 'nsfw')
+```
 
 ---
 
@@ -180,136 +219,200 @@ SD-Host 采用统一的实体查询协议，为模型管理和图像管理提供
 
 ---
 
-## 查询语法示例
+## OData 查询示例
 
 ### 模型查询示例
 
-**1. 基本属性查询:**
+**1. 基本属性过滤:**
 
 ```http
-GET /api/models?type=checkpoint&base_model=SD1.5
-GET /api/models?size>=1000000000&rating>=4.5
-GET /api/models?name~landscape&is_commercial=true
+# 基础过滤
+GET /api/models?$filter=type eq 'checkpoint' and base_model eq 'SD1.5'
+
+# 数值范围过滤
+GET /api/models?$filter=size ge 1000000000 and rating ge 4.5
+
+# 字符串模糊匹配
+GET /api/models?$filter=contains(name, 'landscape') and is_commercial eq true
 ```
 
 **2. 标签查询:**
 
 ```http
 # 包含指定标签
-GET /api/models?tags=photorealistic
+GET /api/models?$filter=tags/any(t: t eq 'photorealistic')
 
-# 包含任一标签 (OR 关系)
-GET /api/models?tags=anime,portrait
+# 包含任一标签
+GET /api/models?$filter=tags/any(t: t eq 'anime' or t eq 'portrait')
 
-# 同时包含多个标签 (AND 关系)  
-GET /api/models?tags=anime&tags=portrait
+# 同时包含多个标签
+GET /api/models?$filter=tags/any(t: t eq 'anime') and tags/any(t: t eq 'portrait')
 
 # 包含指定标签但排除其他标签
-GET /api/models?tags=photorealistic&!tags=nsfw
+GET /api/models?$filter=tags/any(t: t eq 'photorealistic') and not tags/any(t: t eq 'nsfw')
 ```
 
 **3. 复合查询:**
 
 ```http
 # 高质量动漫风格LoRA，排除成人内容
-GET /api/models?type=lora&tags=anime&!tags=nsfw&rating>=4.0
+GET /api/models?$filter=type eq 'lora' and tags/any(t: t eq 'anime') and not tags/any(t: t eq 'nsfw') and rating ge 4.0
 
 # 大型写实风格Checkpoint，允许商用
-GET /api/models?type=checkpoint&tags=photorealistic&size>=2000000000&is_commercial=true
+GET /api/models?$filter=type eq 'checkpoint' and tags/any(t: t eq 'photorealistic') and size ge 2000000000 and is_commercial eq true
+```
+
+**4. 分页和排序:**
+
+```http
+# 按评分降序，分页显示
+GET /api/models?$filter=type eq 'checkpoint'&$orderby=rating desc&$top=20&$skip=0
+
+# 多字段排序
+GET /api/models?$orderby=type asc, rating desc, created_at desc&$top=50
 ```
 
 ### 图像查询示例
 
-**1. 基本属性查询:**
+**1. 基本属性过滤:**
 
 ```http
-GET /api/images?type=generated&model=stable-diffusion-v1-5
-GET /api/images?width>=1024&height>=1024&rating>=4.0
-GET /api/images?is_favorite=true&is_nsfw=false
+# 基础过滤
+GET /api/images?$filter=type eq 'generated' and contains(model, 'stable-diffusion')
+
+# 分辨率过滤
+GET /api/images?$filter=width ge 1024 and height ge 1024 and rating ge 4.0
+
+# 收藏状态过滤
+GET /api/images?$filter=is_favorite eq true and is_nsfw eq false
 ```
 
 **2. 标签查询:**
 
 ```http
 # 包含风景标签
-GET /api/images?tags=landscape
+GET /api/images?$filter=tags/any(t: t eq 'landscape')
 
 # 高质量人像，排除成人内容
-GET /api/images?tags=portrait,high-quality&!tags=nsfw
+GET /api/images?$filter=tags/any(t: t eq 'portrait' or t eq 'high-quality') and not tags/any(t: t eq 'nsfw')
 
 # 收藏的动漫风格图像
-GET /api/images?tags=anime&is_favorite=true
+GET /api/images?$filter=tags/any(t: t eq 'anime') and is_favorite eq true
 ```
 
 **3. 生成参数查询:**
 
 ```http
 # 按生成参数过滤
-GET /api/images?steps>=20&cfg_scale>=7.0&sampler~DPM
+GET /api/images?$filter=steps ge 20 and cfg_scale ge 7.0 and contains(sampler, 'DPM')
 
 # 特定种子范围的图像
-GET /api/images?seed>=1000000&seed<=9999999
+GET /api/images?$filter=seed ge 1000000 and seed le 9999999
+
+# 复合生成参数查询
+GET /api/images?$filter=type eq 'generated' and steps ge 20 and contains(prompt, 'landscape') and not tags/any(t: t eq 'nsfw')
 ```
 
----
+**4. 字段选择和分页:**
 
-## 分页和排序
+```http
+# 只返回基本信息
+GET /api/images?$select=hash,type,width,height,rating&$top=20
+
+# 选择特定字段组合
+GET /api/images?$filter=is_favorite eq true&$select=hash,model,prompt,rating,tags&$orderby=created_at desc
+```
+
+## OData 查询参数
 
 ### 分页参数
 
-- `skip` - 跳过记录数 (分页偏移，默认 0)
-- `take` - 获取记录数 (分页大小，默认 50，最大 200)
+- `$skip` - 跳过记录数 (分页偏移，默认 0)
+- `$top` - 获取记录数 (分页大小，默认 50，最大 200)
 
 ### 排序参数
 
-- `sort` - 排序字段 (支持任何核心属性，默认 `created_at`)
-- `order` - 排序顺序 (`asc`, `desc`, 默认 `desc`)
+- `$orderby` - 排序表达式，支持多字段排序
 
-### 示例
+**示例:**
 
 ```http
-# 按评分降序，分页显示
-GET /api/models?type=checkpoint&sort=rating&order=desc&skip=0&take=20
+# 按单一字段排序
+$orderby=rating desc
 
-# 按创建时间排序
-GET /api/images?sort=created_at&order=desc&skip=50&take=25
+# 按多字段排序  
+$orderby=type asc, rating desc, created_at desc
 
-# 按大小排序查找大型模型
-GET /api/models?sort=size&order=desc&take=10
+# 组合分页和排序
+$top=20&$skip=40&$orderby=size desc
+```
+
+### 字段选择
+
+- `$select` - 选择返回的字段
+
+**示例:**
+
+```http
+# 只返回基本信息
+$select=hash,name,type,size
+
+# 返回指定字段组合
+$select=hash,name,rating,tags
 ```
 
 ---
 
 ## 性能优化建议
 
-1. **类型过滤优先**: 优先使用 `type` 参数过滤，可显著减少查询时间
+1. **$filter 优化**: 将选择性高的条件放在前面，利用短路求值
 2. **索引字段**: 核心属性通常已建立索引，查询效率更高
-3. **标签组合**: 合理使用标签的 AND/OR 组合，避免过度复杂的查询
-4. **分页控制**: 使用适当的 `take` 值，避免返回过多结果
-5. **范围查询**: 数字范围查询 (`>=`, `<=`) 比精确匹配更灵活
+3. **标签查询**: 合理使用标签的 any/all 操作符，避免过度复杂的表达式
+4. **$top 控制**: 使用适当的 `$top` 值，避免返回过多结果
+5. **$select 优化**: 只选择需要的字段，减少数据传输量
 
 ---
 
 ## 错误处理
 
-### 查询参数验证错误 (400 Bad Request)
+### OData 查询错误 (400 Bad Request)
 
 ```json
 {
-  "error": "Invalid query parameter",
-  "details": {
-    "size": "Invalid number format",
-    "tags": "Invalid tag format",
-    "type": "Invalid entity type"
+  "error": {
+    "code": "InvalidFilter",
+    "message": "The $filter expression is invalid",
+    "details": {
+      "expression": "size ge abc",
+      "issue": "Cannot convert 'abc' to type 'Edm.Int64'"
+    }
   }
 }
 ```
 
-### 不支持的操作符错误
+### 不支持的操作错误
 
 ```json
 {
-  "error": "Unsupported operator",
-  "message": "String fields do not support '>' operator. Use '=', '!=' or '~'"
+  "error": {
+    "code": "UnsupportedFunction", 
+    "message": "The function 'regex' is not supported in $filter expressions",
+    "target": "$filter"
+  }
+}
+```
+
+### 标签查询错误
+
+```json
+{
+  "error": {
+    "code": "InvalidLambdaExpression",
+    "message": "Invalid lambda expression in tags collection filter",
+    "details": {
+      "expression": "tags/any(t: t contains 'invalid')",
+      "issue": "String function 'contains' requires two parameters"
+    }
+  }
 }
 ```

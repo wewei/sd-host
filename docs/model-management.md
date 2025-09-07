@@ -26,48 +26,49 @@
 
 ### 1. GET /api/models
 
-获取可用模型列表，支持基于实体查询协议的高级查询和过滤。
+获取可用模型列表，支持基于 OData 标准的高级查询和过滤。
 
-📖 **查询语法详细说明**: [实体查询协议](./entity-query-protocol.md)
+📖 **查询语法详细说明**: [实体查询协议 (OData)](./entity-query-protocol.md)
 
 **基础查询参数:**
 
-- `skip` - 跳过记录数 (分页偏移，默认 0)
-- `take` - 获取记录数 (分页大小，默认 50，最大 200)
-- `sort` - 排序字段 (支持任何元数据字段，默认 `created_at`)
-- `order` - 排序顺序 (`asc`, `desc`, 默认 `desc`)
+- `$skip` - 跳过记录数 (分页偏移，默认 0)
+- `$top` - 获取记录数 (分页大小，默认 50，最大 200)
+- `$orderby` - 排序表达式 (默认 `created_at desc`)
+- `$select` - 选择返回字段
+- `$filter` - OData 过滤表达式
 
-**元数据过滤 (使用实体查询协议):**
+**过滤表达式示例 ($filter):**
 
-- `type=checkpoint` - 按模型类型过滤
-- `base_model=SD1.5` - 按基础模型过滤
-- `name~landscape` - 按名称模糊搜索
-- `size>=1000000000` - 按文件大小范围过滤
-- `rating>=4.5` - 按评分过滤
-- `tags=anime` - 包含动漫标签
-- `!tags=nsfw` - 排除成人内容标签
-- `is_commercial=true` - 按商用许可过滤
+- `type eq 'checkpoint'` - 按模型类型过滤
+- `contains(base_model, 'SD1.5')` - 按基础模型过滤
+- `contains(name, 'landscape')` - 按名称模糊搜索
+- `size ge 1000000000` - 按文件大小范围过滤
+- `rating ge 4.5` - 按评分过滤
+- `tags/any(t: t eq 'anime')` - 包含动漫标签
+- `not tags/any(t: t eq 'nsfw')` - 排除成人内容标签
+- `is_commercial eq true` - 按商用许可过滤
 
 **请求示例:**
 
 ```http
 # 基础查询
-GET /api/models?type=checkpoint&skip=0&take=20&sort=name&order=asc
+GET /api/models?$filter=type eq 'checkpoint'&$top=20&$orderby=name asc
 
-# 标签过滤 (使用标签查询)
-GET /api/models?type=lora&tags=anime&!tags=nsfw&take=20
+# 标签过滤 (使用 OData lambda 表达式)
+GET /api/models?$filter=type eq 'lora' and tags/any(t: t eq 'anime') and not tags/any(t: t eq 'nsfw')&$top=20
 
 # 大小和评分过滤
-GET /api/models?size>=1000000000&rating>=4.5
+GET /api/models?$filter=size ge 1000000000 and rating ge 4.5
 
 # 基础模型过滤
-GET /api/models?type=checkpoint&base_model=SD1.5&is_nsfw=false
+GET /api/models?$filter=type eq 'checkpoint' and contains(base_model, 'SD1.5') and is_nsfw eq false
 
 # 名称模糊搜索
-GET /api/models?name~landscape&type=lora&tags=landscape
+GET /api/models?$filter=contains(name, 'landscape') and type eq 'lora' and tags/any(t: t eq 'landscape')
 
 # 复合查询
-GET /api/models?type=checkpoint&tags=photorealistic&base_model=SDXL&is_commercial=true
+GET /api/models?$filter=type eq 'checkpoint' and tags/any(t: t eq 'photorealistic') and contains(base_model, 'SDXL') and is_commercial eq true
 ```
 
 ### 2. GET /api/models/{model_hash}
