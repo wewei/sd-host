@@ -15,51 +15,67 @@
 
 ### 1. GET /api/images
 
-查询图像，使用 OData 标准查询协议进行过滤，返回图像哈希列表和属性。
+查询图像，使用 JSON API 标准查询协议进行过滤，返回图像哈希列表和属性。
 
-📖 **查询语法详细说明**: [实体查询协议 (OData)](./entity-query-protocol.md)
+📖 **查询语法详细说明**: [实体查询协议 (JSON API)](./entity-query-protocol.md)
 
 **基础查询参数:**
 
-- `$skip` - 跳过记录数 (分页偏移，默认 0)
-- `$top` - 获取记录数 (分页大小，默认 50，最大 200)
-- `$orderby` - 排序表达式 (默认 `created_at desc`)
-- `$select` - 选择返回字段
-- `$filter` - OData 过滤表达式
+- `page[number]` - 页码 (从 1 开始，默认 1)
+- `page[size]` - 每页大小 (默认 50，最大 200)
+- `sort` - 排序表达式 (默认 `-created_at`)
+- `fields[image]` - 选择返回字段
+- `filter[field]` - JSON API 过滤表达式
+- `include` - 包含关联资源
 
-**过滤表达式示例 ($filter):**
+**过滤表达式示例 (filter):**
 
-- `width ge 1024` - 按宽度过滤
-- `seed eq 1234567890` - 按随机种子过滤
-- `tags/any(t: t eq 'landscape')` - 包含风景标签
-- `not tags/any(t: t eq 'nsfw')` - 排除成人内容标签
-- `task_id eq 'uuid-123'` - 按关联任务过滤
+- `filter[width][gte]=1024` - 按宽度过滤
+- `filter[seed]=1234567890` - 按随机种子过滤
+- `filter[tags][any]=landscape` - 包含风景标签
+- `filter[tags][none]=nsfw` - 排除成人内容标签
+- `filter[task_id]=uuid-123` - 按关联任务过滤
 
 **响应:**
 
 ```json
 {
-  "images": [
+  "data": [
     {
-      "hash": "abc123...",
-      "metadata": {
-        "type": "generated",
-        "model": "stable-diffusion-v1-5",
+      "type": "image",
+      "id": "abc123...",
+      "attributes": {
         "width": 512,
         "height": 512,
-        "rating": 4.5,
-        "tag_landscape": true,
-        "tag_high_quality": true,
-        "is_favorite": true,
-        "is_nsfw": false
+        "size": 1024000,
+        "seed": 1234567890,
+        "created_at": "2024-01-01T00:00:00Z"
+      },
+      "relationships": {
+        "task": {
+          "data": {"type": "task", "id": "uuid-789..."}
+        },
+        "tags": {
+          "data": [
+            {"type": "tag", "id": "landscape"},
+            {"type": "tag", "id": "high_quality"},
+            {"type": "tag", "id": "favorite"}
+          ]
+        }
       }
     }
   ],
-  "pagination": {
+  "meta": {
     "total": 156,
-    "skip": 0,
-    "take": 20,
-    "has_more": true
+    "page": {
+      "number": 1,
+      "size": 20,
+      "total": 8
+    }
+  },
+  "links": {
+    "self": "/api/images?page[number]=1&page[size]=20",
+    "next": "/api/images?page[number]=2&page[size]=20"
   }
 }
 ```
@@ -72,14 +88,29 @@
 
 ```json
 {
-  "hash": "abc123...",
-  "task_id": "uuid-789...",
-  "width": 512,
-  "height": 512,
-  "size": 1024000,
-  "seed": 1234567890,
-  "created_at": "2024-01-01T00:00:00Z",
-  "tags": ["landscape", "nature", "high_quality"]
+  "data": {
+    "type": "image",
+    "id": "abc123...",
+    "attributes": {
+      "width": 512,
+      "height": 512,
+      "size": 1024000,
+      "seed": 1234567890,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    "relationships": {
+      "task": {
+        "data": {"type": "task", "id": "uuid-789..."}
+      },
+      "tags": {
+        "data": [
+          {"type": "tag", "id": "landscape"},
+          {"type": "tag", "id": "nature"},
+          {"type": "tag", "id": "high_quality"}
+        ]
+      }
+    }
+  }
 }
 ```
 
@@ -202,36 +233,36 @@ Content-Length: 1234567
 **1. 查找收藏的高质量图像:**
 
 ```http
-GET /api/images?is_favorite&rating>=4.5&tag_high_quality
+GET /api/images?filter[tags][all]=favorite,high_quality
 ```
 
-**2. 按模型和分辨率过滤:**
+**2. 按分辨率过滤:**
 
 ```http
-GET /api/images?model~stable-diffusion&width>=1024&height>=1024
+GET /api/images?filter[width][gte]=1024&filter[height][gte]=1024
 ```
 
 **3. 查找特定风格图像，排除成人内容:**
 
 ```http
-GET /api/images?tag_landscape&tag_nature&!is_nsfw&take=50
+GET /api/images?filter[tags][any]=landscape,nature&filter[tags][none]=nsfw&page[size]=50
 ```
 
-**4. 按生成参数查询:**
+**4. 按关联任务查询:**
 
 ```http
-GET /api/images?steps>=20&cfg_scale>=7.0&!tag_nsfw
+GET /api/images?filter[task_id][not_null]=true&include=task
 ```
 
 ### 批量操作示例
 
-**批量设置评分:**
+**批量设置标签:**
 
 ```http
 POST /api/images
 {
-  "abc123...": {"rating": 5.0, "tag_masterpiece": true},
-  "def456...": {"rating": 4.8, "is_favorite": true}
+  "abc123...": {"tags": ["masterpiece", "favorite"]},
+  "def456...": {"tags": ["high_quality", "landscape"]}
 }
 ```
 
@@ -240,6 +271,10 @@ POST /api/images
 ```http
 DELETE /api/images
 {
-  "hashes": ["hash1...", "hash2...", "hash3..."]
+  "data": [
+    {"type": "image", "id": "hash1..."},
+    {"type": "image", "id": "hash2..."},
+    {"type": "image", "id": "hash3..."}
+  ]
 }
 ```

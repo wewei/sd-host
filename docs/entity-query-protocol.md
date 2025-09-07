@@ -1,237 +1,401 @@
 # 实体查询协议 (Entity Query Protocol)
 
-SD-Host 采用基于 OData 标准的实体查询协议，为模型管理和图像管理提供标准化且强大的查询和过滤能力。
+SD-Host 采用基于 JSON API 标准的实体查询协议，为模型管理和图像管理提供标准化且强大的查询和过滤能力。
 
 ## 设计理念
 
-- **标准化**: 遵循 OData 查询标准，与业界最佳实践保持一致
+- **标准化**: 遵循 JSON API 查询标准，简洁直观
 - **统一标准**: 模型和图像使用相同的查询语法
-- **清晰分离**: 核心属性 (properties) 与标签系统 (tags) 分离
-- **URL友好**: 符合 OData URL 编码规范
+- **清晰分离**: 核心属性 (attributes) 与关系 (relationships) 分离
+- **JSON 原生**: 完全基于 JSON 格式，易于解析和使用
 
 ---
 
 ## 实体结构设计
 
-### 实体组成
+## 实体结构设计
 
-每个实体由两部分组成：
+### JSON API 规范
 
-1. **核心属性 (Properties)**: 实体的基本信息和固定属性
-2. **标签系统 (Tags)**: 灵活的标记和分类系统
+每个实体遵循 JSON API 标准格式：
+
+1. **类型 (type)**: 实体类型标识符
+2. **ID (id)**: 唯一标识符 
+3. **属性 (attributes)**: 实体的核心数据
+4. **关系 (relationships)**: 与其他实体的关联
 
 ```json
 {
-  // 核心属性 - 固定字段
-  "hash": "abc123...",
-  "name": "stable-diffusion-v1-5",
-  "type": "checkpoint",
-  "size": 4200000000,
-  "created_at": "2024-01-01T00:00:00Z",
-  
-  // 标签系统 - 灵活标记
-  "tags": ["photorealistic", "general", "portrait"]
+  "data": {
+    "type": "model",
+    "id": "abc123...",
+    "attributes": {
+      "name": "stable-diffusion-v1-5",
+      "type": "checkpoint",
+      "size": 4200000000,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    "relationships": {
+      "tags": {
+        "data": [
+          {"type": "tag", "id": "photorealistic"},
+          {"type": "tag", "id": "general"}
+        ]
+      }
+    }
+  }
 }
 ```
 
-## OData 查询语法
+## JSON API 查询语法
 
-### $filter 查询表达式
+### 查询参数
 
-基于 OData v4 标准的 `$filter` 查询参数进行实体过滤。
+JSON API 使用标准的查询参数进行数据过滤和操作：
 
-### 比较操作符
+**基本参数：**
 
-**等值比较:**
+- `filter[field]` - 字段过滤
+- `sort` - 排序字段
+- `page[size]` - 页面大小
+- `page[number]` - 页面编号
+- `fields[type]` - 字段选择
+- `include` - 包含关联资源
 
-- `name eq 'stable-diffusion-v1-5'` - 精确匹配
-- `name ne 'old-model'` - 不等于
-- `type eq 'checkpoint'` - 类型匹配
+### 过滤操作
 
-**数值比较:**
+**等值过滤：**
 
-- `size gt 1000000000` - 大于
-- `size ge 1000000000` - 大于等于
-- `size lt 5000000000` - 小于  
-- `size le 5000000000` - 小于等于
-- `width eq 1024` - 等于
+- `filter[type]=checkpoint` - 精确匹配
+- `filter[name]=stable-diffusion-v1-5` - 字符串匹配
 
-**字符串操作:**
+**比较操作：**
 
-- `contains(name, 'landscape')` - 包含子字符串
-- `startswith(name, 'stable')` - 以指定字符串开头
-- `endswith(name, 'v1-5')` - 以指定字符串结尾
+- `filter[size][gte]=1000000000` - 大于等于
+- `filter[size][lte]=5000000000` - 小于等于
+- `filter[size][gt]=1000000000` - 大于
+- `filter[size][lt]=5000000000` - 小于
 
-**基于标签的查询:**
+**字符串操作：**
 
-- `tags/any(t: t eq 'nsfw')` - 包含特定标签
-- `not tags/any(t: t eq 'nsfw')` - 不包含特定标签
+- `filter[name][contains]=landscape` - 包含子字符串
+- `filter[name][starts_with]=stable` - 以指定字符串开头
+- `filter[name][ends_with]=v1-5` - 以指定字符串结尾
+
+**数组操作：**
+
+- `filter[type][in]=checkpoint,lora` - 包含于列表
+- `filter[type][not_in]=vae,embedding` - 不包含于列表
+
+**标签过滤：**
+
+- `filter[tags][any]=photorealistic` - 包含指定标签
+- `filter[tags][all]=anime,portrait` - 包含所有指定标签
+- `filter[tags][none]=nsfw` - 不包含指定标签
 
 ### 逻辑操作符
 
-**组合条件:**
+**组合条件：**
 
 - `and` - 逻辑与
-- `or` - 逻辑或  
+- `or` - 逻辑或
 - `not` - 逻辑非
 
-**示例:**
+**示例：**
 
 ```http
-# 逻辑与
-$filter=type eq 'checkpoint' and size ge 1000000000
+# 逻辑与 (默认)
+filter[type]=checkpoint&filter[size][gte]=1000000000
 
-# 逻辑或
-$filter=type eq 'lora' or type eq 'checkpoint'
+# 逻辑或 (使用 OR 前缀)
+filter[or][type]=lora&filter[or][type]=checkpoint
 
-# 逻辑非
-$filter=not tags/any(t: t eq 'nsfw')
+# 逻辑非 (使用 not 前缀)
+filter[not][tags][any]=nsfw
 
 # 复合条件
-$filter=type eq 'checkpoint' and (tags/any(t: t eq 'high_quality') or tags/any(t: t eq 'popular'))
+filter[type]=checkpoint&filter[or][tags][any]=high_quality&filter[or][tags][any]=popular
 ```
 
-### 标签查询扩展
+### 排序操作
 
-虽然 OData 标准不直接支持数组查询，我们扩展了标签查询语法：
+**单字段排序：**
 
-**标签包含:**
+- `sort=name` - 按名称升序
+- `sort=-name` - 按名称降序
+- `sort=created_at` - 按创建时间升序
+- `sort=-created_at` - 按创建时间降序
 
-- `tags/any(t: t eq 'landscape')` - 包含指定标签
-- `tags/any(t: t eq 'anime' or t eq 'portrait')` - 包含任一标签
-
-**标签排除:**
-
-- `not tags/any(t: t eq 'nsfw')` - 不包含指定标签
-
-**标签组合:**
+**多字段排序：**
 
 ```http
-# 同时包含多个标签
-$filter=tags/any(t: t eq 'anime') and tags/any(t: t eq 'portrait')
+# 先按类型升序，再按大小降序
+sort=type,-size
 
-# 包含指定标签但排除其他标签
-$filter=tags/any(t: t eq 'photorealistic') and not tags/any(t: t eq 'nsfw')
+# 先按标签数降序，再按创建时间降序
+sort=-tag_count,-created_at
+```
+
+### 分页参数
+
+**基于页码的分页：**
+
+- `page[number]` - 页码 (从 1 开始)
+- `page[size]` - 每页大小 (默认 50，最大 200)
+
+**基于偏移的分页：**
+
+- `page[offset]` - 偏移量 (从 0 开始) 
+- `page[limit]` - 限制数量
+
+**示例：**
+
+```http
+# 第一页，每页 20 条
+page[number]=1&page[size]=20
+
+# 第二页，每页 20 条  
+page[number]=2&page[size]=20
+
+# 使用偏移量
+page[offset]=40&page[limit]=20
+```
+
+### 字段选择
+
+**稀疏字段集：**
+
+- `fields[model]` - 选择模型资源的字段
+- `fields[tag]` - 选择标签资源的字段
+
+**示例：**
+
+```http
+# 只返回模型的名称和类型
+fields[model]=name,type
+
+# 返回模型和标签的指定字段
+fields[model]=name,type,size&fields[tag]=name
+```
+
+### 包含关联资源
+
+**include 参数：**
+
+- `include=tags` - 包含标签信息
+- `include=cover_image` - 包含封面图像
+- `include=task` - 包含关联任务
+
+**示例：**
+
+```http
+# 包含标签信息
+include=tags
+
+# 包含多个关联资源
+include=tags,cover_image
 ```
 
 ---
 
 ## 模型实体标准
 
-### 模型核心属性 (Properties)
+### 模型 JSON API 格式
 
 ```json
 {
-  "hash": "abc123...",              // SHA256 哈希 (唯一标识)
-  "name": "stable-diffusion-v1-5",  // 模型名称
-  "type": "checkpoint",             // 模型类型
-  "base_model": "SD1.5",           // 基础模型架构
-  "size": 4200000000,              // 文件大小 (字节)
-  "sourceUrl": "https://civitai.com/models/...", // 下载来源URL
-  "metadata": "{\"resolution\": 512, \"trigger_words\": [\"masterpiece\"], \"training_epochs\": 100}", // 模型参数信息 (JSON)
-  "description": "# Stable Diffusion v1.5\n\n这是一个通用的文生图模型...", // 模型描述 (Markdown)
-  "cover_image_hash": "def456...",  // 封面图像哈希 (可选)
-  "created_at": "2024-01-01T00:00:00Z",
-  "updated_at": "2024-01-01T00:00:00Z"
+  "data": {
+    "type": "model",
+    "id": "abc123...",
+    "attributes": {
+      "name": "stable-diffusion-v1-5",
+      "model_type": "checkpoint",
+      "base_model": "SD1.5",
+      "size": 4200000000,
+      "source_url": "https://civitai.com/models/...",
+      "metadata": {
+        "resolution": 512,
+        "trigger_words": ["masterpiece"],
+        "training_epochs": 100
+      },
+      "description": "# Stable Diffusion v1.5\n\n这是一个通用的文生图模型...",
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    "relationships": {
+      "tags": {
+        "data": [
+          {"type": "tag", "id": "photorealistic"},
+          {"type": "tag", "id": "general"},
+          {"type": "tag", "id": "portrait"}
+        ]
+      },
+      "cover_image": {
+        "data": {"type": "image", "id": "def456..."}
+      }
+    }
+  }
 }
 ```
 
-### 模型标签系统 (Tags)
+### 模型标签分类
 
 模型标签采用分类标记方式：
 
 ```json
 {
-  "tags": [
-    // 风格标签
-    "photorealistic", "anime", "cartoon", "artistic",
-    
-    // 内容标签  
-    "portrait", "landscape", "character", "object",
-    
-    // 质量标签
-    "high-quality", "detailed", "masterpiece",
-    
-    // 特殊标签
-    "nsfw", "commercial", "free"
-  ]
+  "relationships": {
+    "tags": {
+      "data": [
+        // 风格标签
+        {"type": "tag", "id": "photorealistic"},
+        {"type": "tag", "id": "anime"},
+        {"type": "tag", "id": "cartoon"},
+        
+        // 内容标签  
+        {"type": "tag", "id": "portrait"},
+        {"type": "tag", "id": "landscape"},
+        {"type": "tag", "id": "character"},
+        
+        // 质量标签
+        {"type": "tag", "id": "high-quality"},
+        {"type": "tag", "id": "detailed"},
+        
+        // 特殊标签
+        {"type": "tag", "id": "commercial"},
+        {"type": "tag", "id": "nsfw"}
+      ]
+    }
+  }
 }
 ```
 
 ## 图像实体标准
 
-### 图像核心属性 (Properties)
+### 图像 JSON API 格式
 
 ```json
 {
-  "hash": "def456...",              // SHA256 哈希 (唯一标识)
-  "task_id": "uuid-123...",         // 关联任务ID (可选，间接关联模型)
-  "width": 512,                     // 宽度
-  "height": 512,                    // 高度
-  "size": 1024000,                  // 文件大小 (字节)
-  "seed": 1234567890,               // 随机种子
-  "created_at": "2024-01-01T00:00:00Z"
+  "data": {
+    "type": "image",
+    "id": "def456...",
+    "attributes": {
+      "width": 512,
+      "height": 512,
+      "size": 1024000,
+      "seed": 1234567890,
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    "relationships": {
+      "task": {
+        "data": {"type": "task", "id": "uuid-123..."}
+      },
+      "tags": {
+        "data": [
+          {"type": "tag", "id": "landscape"},
+          {"type": "tag", "id": "nature"},
+          {"type": "tag", "id": "high-quality"}
+        ]
+      }
+    }
+  }
 }
 ```
 
-### 图像标签系统 (Tags)
+### 图像标签分类
 
 图像标签用于内容分类和快速筛选：
 
 ```json
 {
-  "tags": [
-    // 内容标签
-    "landscape", "portrait", "nature", "architecture",
-    
-    // 风格标签
-    "photorealistic", "anime", "artistic", "cartoon",
-    
-    // 质量标签  
-    "high-quality", "detailed", "masterpiece",
-    
-    // 特殊标签
-    "nsfw", "favorite", "wallpaper"
-  ]
+  "relationships": {
+    "tags": {
+      "data": [
+        // 内容标签
+        {"type": "tag", "id": "landscape"},
+        {"type": "tag", "id": "portrait"},
+        {"type": "tag", "id": "nature"},
+        
+        // 风格标签
+        {"type": "tag", "id": "photorealistic"},
+        {"type": "tag", "id": "anime"},
+        {"type": "tag", "id": "artistic"},
+        
+        // 质量标签  
+        {"type": "tag", "id": "high-quality"},
+        {"type": "tag", "id": "detailed"},
+        {"type": "tag", "id": "masterpiece"},
+        
+        // 特殊标签
+        {"type": "tag", "id": "favorite"},
+        {"type": "tag", "id": "wallpaper"},
+        {"type": "tag", "id": "nsfw"}
+      ]
+    }
+  }
 }
 ```
 
-### 任务核心属性 (Properties)
+## 任务实体标准
+
+### 任务 JSON API 格式
 
 任务包含生成参数，图像通过 task_id 关联到任务获取生成信息：
 
 ```json
 {
-  "id": "uuid-123...",              // 任务唯一标识 (UUID)
-  "status": "completed",            // 任务状态 (pending, completed, failed, cancelled)
-  "checkpoint_hash": "abc123...",   // 主模型 (Checkpoint)
-  
-  // 生成参数
-  "prompt": "a beautiful landscape, masterpiece, high quality",
-  "negative_prompt": "blurry, low quality, worst quality",
-  "width": 768,
-  "height": 768,
-  "seed": 1234567890,
-  "steps": 30,
-  "cfg_scale": 8.0,
-  "sampler": "DPM++ 2M Karras",
-  "batch_size": 4,
-  "vae_hash": "vae456...",          // VAE 模型 (可选)
-  
-  // 时间戳
-  "created_at": "2024-01-01T00:00:00Z",
-  "promoted_at": "2024-01-01T00:05:00Z",
-  "completed_at": "2024-01-01T00:05:45Z",
-  
-  // 关联的非 checkpoint 模型
-  "additional_models": [
-    {
-      "model_hash": "lora123...",
-      "weight": 0.8
+  "data": {
+    "type": "task",
+    "id": "uuid-123...",
+    "attributes": {
+      "status": "completed",
+      "prompt": "a beautiful landscape, masterpiece, high quality",
+      "negative_prompt": "blurry, low quality, worst quality",
+      "width": 768,
+      "height": 768,
+      "seed": 1234567890,
+      "steps": 30,
+      "cfg_scale": 8.0,
+      "sampler": "DPM++ 2M Karras",
+      "batch_size": 4,
+      "error_message": null,
+      "created_at": "2024-01-01T00:00:00Z",
+      "promoted_at": "2024-01-01T00:05:00Z",
+      "completed_at": "2024-01-01T00:05:45Z",
+      "updated_at": "2024-01-01T00:05:45Z"
     },
+    "relationships": {
+      "checkpoint": {
+        "data": {"type": "model", "id": "abc123..."}
+      },
+      "vae": {
+        "data": {"type": "model", "id": "vae456..."}
+      },
+      "additional_models": {
+        "data": [
+          {"type": "task_model", "id": "tm_001"}
+        ]
+      },
+      "tags": {
+        "data": [
+          {"type": "tag", "id": "landscape"},
+          {"type": "tag", "id": "batch_generation"}
+        ]
+      }
+    }
+  },
+  "included": [
     {
-      "model_hash": "controlnet456...",
-      "weight": 1.0
+      "type": "task_model",
+      "id": "tm_001",
+      "attributes": {
+        "weight": 0.8
+      },
+      "relationships": {
+        "model": {
+          "data": {"type": "model", "id": "lora123..."}
+        }
+      }
     }
   ]
 }
@@ -239,174 +403,218 @@ $filter=tags/any(t: t eq 'photorealistic') and not tags/any(t: t eq 'nsfw')
 
 ---
 
-## OData 查询示例
+## JSON API 查询示例
 
 ### 模型查询示例
 
-**1. 基本属性过滤:**
+**1. 基本属性过滤：**
 
 ```http
 # 基础过滤
-GET /api/models?$filter=type eq 'checkpoint' and base_model eq 'SD1.5'
+GET /api/models?filter[model_type]=checkpoint&filter[base_model]=SD1.5
 
 # 数值范围过滤
-GET /api/models?$filter=size ge 1000000000 and rating ge 4.5
+GET /api/models?filter[size][gte]=1000000000
 
 # 字符串模糊匹配
-GET /api/models?$filter=contains(name, 'landscape') and is_commercial eq true
+GET /api/models?filter[name][contains]=landscape
 ```
 
-**2. 标签查询:**
+**2. 标签查询：**
 
 ```http
 # 包含指定标签
-GET /api/models?$filter=tags/any(t: t eq 'photorealistic')
+GET /api/models?filter[tags][any]=photorealistic
 
 # 包含任一标签
-GET /api/models?$filter=tags/any(t: t eq 'anime' or t eq 'portrait')
+GET /api/models?filter[tags][any]=anime,portrait
 
 # 同时包含多个标签
-GET /api/models?$filter=tags/any(t: t eq 'anime') and tags/any(t: t eq 'portrait')
+GET /api/models?filter[tags][all]=anime,portrait
 
 # 包含指定标签但排除其他标签
-GET /api/models?$filter=tags/any(t: t eq 'photorealistic') and not tags/any(t: t eq 'nsfw')
+GET /api/models?filter[tags][any]=photorealistic&filter[tags][none]=nsfw
 ```
 
-**3. 复合查询:**
+**3. 复合查询：**
 
 ```http
 # 高质量动漫风格LoRA，排除成人内容
-GET /api/models?$filter=type eq 'lora' and tags/any(t: t eq 'anime') and not tags/any(t: t eq 'nsfw') and tags/any(t: t eq 'high_quality')
+GET /api/models?filter[model_type]=lora&filter[tags][any]=anime&filter[tags][all]=high_quality&filter[tags][none]=nsfw
 
 # 大型写实风格Checkpoint
-GET /api/models?$filter=type eq 'checkpoint' and tags/any(t: t eq 'photorealistic') and size ge 2000000000 and tags/any(t: t eq 'commercial')
+GET /api/models?filter[model_type]=checkpoint&filter[tags][any]=photorealistic&filter[size][gte]=2000000000&filter[tags][any]=commercial
 ```
 
-**4. 分页和排序:**
+**4. 分页和排序：**
 
 ```http
 # 按创建时间降序，分页显示
-GET /api/models?$filter=type eq 'checkpoint'&$orderby=created_at desc&$top=20&$skip=0
+GET /api/models?filter[model_type]=checkpoint&sort=-created_at&page[number]=1&page[size]=20
 
 # 多字段排序
-GET /api/models?$orderby=type asc, size desc, created_at desc&$top=50
+GET /api/models?sort=model_type,-size,-created_at&page[size]=50
 ```
 
 ### 图像查询示例
 
-**1. 基本属性过滤:**
+**1. 基本属性过滤：**
 
 ```http
 # 基础过滤
-GET /api/images?$filter=task_id ne null
+GET /api/images?filter[task_id][not_null]=true
 
 # 分辨率过滤
-GET /api/images?$filter=width ge 1024 and height ge 1024 and tags/any(t: t eq 'high_quality')
+GET /api/images?filter[width][gte]=1024&filter[height][gte]=1024&filter[tags][any]=high_quality
 
 # 种子过滤
-GET /api/images?$filter=seed eq 1234567890
+GET /api/images?filter[seed]=1234567890
 ```
 
-**2. 标签查询:**
+**2. 标签查询：**
 
 ```http
 # 包含风景标签
-GET /api/images?$filter=tags/any(t: t eq 'landscape')
+GET /api/images?filter[tags][any]=landscape
 
 # 高质量人像，排除成人内容
-GET /api/images?$filter=tags/any(t: t eq 'portrait' or t eq 'high-quality') and not tags/any(t: t eq 'nsfw')
+GET /api/images?filter[tags][any]=portrait,high-quality&filter[tags][none]=nsfw
 
 # 收藏的动漫风格图像
-GET /api/images?$filter=tags/any(t: t eq 'anime') and is_favorite eq true
+GET /api/images?filter[tags][all]=anime,favorite
 ```
 
-**3. 生成参数查询:**
+**3. 关联查询：**
 
 ```http
-# 按生成参数过滤
-GET /api/images?$filter=steps ge 20 and cfg_scale ge 7.0 and contains(sampler, 'DPM')
+# 包含任务信息
+GET /api/images?include=task
 
-# 特定种子范围的图像
-GET /api/images?$filter=seed ge 1000000 and seed le 9999999
-
-# 复合生成参数查询
-GET /api/images?$filter=type eq 'generated' and steps ge 20 and contains(prompt, 'landscape') and not tags/any(t: t eq 'nsfw')
+# 包含标签和任务信息
+GET /api/images?include=tags,task&fields[image]=width,height,seed&fields[task]=prompt,steps
 ```
 
-**4. 字段选择和分页:**
+**4. 字段选择和分页：**
 
 ```http
 # 只返回基本信息
-GET /api/images?$select=hash,type,width,height,rating&$top=20
+GET /api/images?fields[image]=width,height,size&page[size]=20
 
 # 选择特定字段组合
-GET /api/images?$filter=is_favorite eq true&$select=hash,model,prompt,rating,tags&$orderby=created_at desc
+GET /api/images?filter[tags][any]=favorite&fields[image]=size,seed&sort=-created_at
 ```
 
-## OData 查询参数
+### 任务查询示例
 
-### 分页参数
-
-- `$skip` - 跳过记录数 (分页偏移，默认 0)
-- `$top` - 获取记录数 (分页大小，默认 50，最大 200)
-
-### 排序参数
-
-- `$orderby` - 排序表达式，支持多字段排序
-
-**示例:**
+**1. 状态过滤：**
 
 ```http
-# 按单一字段排序
-$orderby=rating desc
+# 已完成的任务
+GET /api/tasks?filter[status]=completed
 
-# 按多字段排序  
-$orderby=type asc, rating desc, created_at desc
-
-# 组合分页和排序
-$top=20&$skip=40&$orderby=size desc
+# 失败的任务
+GET /api/tasks?filter[status]=failed&include=checkpoint
 ```
 
-### 字段选择
-
-- `$select` - 选择返回的字段
-
-**示例:**
+**2. 生成参数过滤：**
 
 ```http
-# 只返回基本信息
-$select=hash,name,type,size
+# 按步数和CFG过滤
+GET /api/tasks?filter[steps][gte]=20&filter[cfg_scale][gte]=7.0
 
-# 返回指定字段组合
-$select=hash,name,rating,tags
+# 按采样器过滤
+GET /api/tasks?filter[sampler][contains]=DPM
+
+# 特定分辨率任务
+GET /api/tasks?filter[width]=1024&filter[height]=1024
+```
+
+**3. 关联查询：**
+
+```http
+# 包含模型和标签信息
+GET /api/tasks?include=checkpoint,vae,tags&filter[status]=completed
+
+# 包含附加模型信息
+GET /api/tasks?include=checkpoint,additional_models.model&fields[task]=prompt,steps,cfg_scale
 ```
 
 ---
 
-## 性能优化建议
+## JSON API 响应格式
 
-1. **$filter 优化**: 将选择性高的条件放在前面，利用短路求值
-2. **索引字段**: 核心属性通常已建立索引，查询效率更高
-3. **标签查询**: 合理使用标签的 any/all 操作符，避免过度复杂的表达式
-4. **$top 控制**: 使用适当的 `$top` 值，避免返回过多结果
-5. **$select 优化**: 只选择需要的字段，减少数据传输量
+### 成功响应格式
+
+**单个资源：**
+
+```json
+{
+  "data": {
+    "type": "model",
+    "id": "abc123...",
+    "attributes": { /* ... */ },
+    "relationships": { /* ... */ }
+  },
+  "included": [ /* 相关资源 */ ]
+}
+```
+
+**资源集合：**
+
+```json
+{
+  "data": [
+    {
+      "type": "model",
+      "id": "abc123...",
+      "attributes": { /* ... */ },
+      "relationships": { /* ... */ }
+    }
+  ],
+  "meta": {
+    "total": 156,
+    "page": {
+      "number": 1,
+      "size": 20,
+      "total": 8
+    }
+  },
+  "links": {
+    "self": "/api/models?page[number]=1&page[size]=20",
+    "next": "/api/models?page[number]=2&page[size]=20",
+    "last": "/api/models?page[number]=8&page[size]=20"
+  },
+  "included": [ /* 相关资源 */ ]
+}
+```
+
+### 性能优化建议
+
+1. **字段选择**: 使用 `fields[type]` 参数只获取需要的字段
+2. **分页控制**: 合理设置 `page[size]`，避免一次获取过多数据
+3. **关联资源**: 按需使用 `include` 参数，避免不必要的数据传输
+4. **过滤优化**: 使用索引字段进行过滤，提升查询效率
+5. **缓存策略**: 对频繁查询的结果进行客户端缓存
 
 ---
 
 ## 错误处理
 
-### OData 查询错误 (400 Bad Request)
+### 查询参数错误 (400 Bad Request)
 
 ```json
 {
-  "error": {
-    "code": "InvalidFilter",
-    "message": "The $filter expression is invalid",
-    "details": {
-      "expression": "size ge abc",
-      "issue": "Cannot convert 'abc' to type 'Edm.Int64'"
+  "errors": [
+    {
+      "status": "400",
+      "code": "invalid_filter",
+      "title": "Invalid Filter Parameter",
+      "detail": "The filter[size][xyz] operation is not supported",
+      "source": {
+        "parameter": "filter[size][xyz]"
+      }
     }
-  }
+  ]
 }
 ```
 
@@ -414,11 +622,17 @@ $select=hash,name,rating,tags
 
 ```json
 {
-  "error": {
-    "code": "UnsupportedFunction", 
-    "message": "The function 'regex' is not supported in $filter expressions",
-    "target": "$filter"
-  }
+  "errors": [
+    {
+      "status": "400",
+      "code": "unsupported_operation",
+      "title": "Unsupported Operation",
+      "detail": "The 'regex' operation is not supported for string fields",
+      "source": {
+        "parameter": "filter[name][regex]"
+      }
+    }
+  ]
 }
 ```
 
@@ -426,13 +640,16 @@ $select=hash,name,rating,tags
 
 ```json
 {
-  "error": {
-    "code": "InvalidLambdaExpression",
-    "message": "Invalid lambda expression in tags collection filter",
-    "details": {
-      "expression": "tags/any(t: t contains 'invalid')",
-      "issue": "String function 'contains' requires two parameters"
+  "errors": [
+    {
+      "status": "400",
+      "code": "invalid_tag_filter",
+      "title": "Invalid Tag Filter",
+      "detail": "Tag filter operation 'invalid_op' is not supported. Use 'any', 'all', or 'none'",
+      "source": {
+        "parameter": "filter[tags][invalid_op]"
+      }
     }
-  }
+  ]
 }
 ```

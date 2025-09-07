@@ -8,9 +8,9 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 - **API 前缀**: `/api`
 - **实时通信**: Server-Sent Events (SSE)
 - **目标场景**: 单用户本地部署或局域网使用
-- **查询系统**: 基于 OData 标准的实体查询协议
+- **查询系统**: 基于 JSON API 标准的实体查询协议
 
-📖 **查询协议详细文档**: [实体查询协议 (OData)](./entity-query-protocol.md)
+📖 **查询协议详细文档**: [实体查询协议 (JSON API)](./entity-query-protocol.md)
 
 📊 **数据库设计文档**: [SQLite 数据库表结构](./database-schema.md)
 
@@ -22,7 +22,7 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 
 | 方法 | 端点 | 功能描述 |
 |------|------|----------|
-| GET | `/api/models` | 获取模型列表（支持 OData 查询） |
+| GET | `/api/models` | 获取模型列表（支持 JSON API 查询） |
 | GET | `/api/models/{hash}` | 获取指定模型元数据 |
 | GET | `/api/models/{hash}/content` | 下载模型文件内容 |
 | POST | `/api/models/{hash}` | 修改模型元数据 |
@@ -57,7 +57,7 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 
 | 方法 | 端点 | 功能描述 |
 |------|------|----------|
-| GET | `/api/images` | 获取图像列表（支持 OData 查询） |
+| GET | `/api/images` | 获取图像列表（支持 JSON API 查询） |
 | GET | `/api/images/{hash}` | 获取指定图像元数据 |
 | GET | `/api/images/{hash}/content` | 获取图像文件内容 |
 | POST | `/api/images/{hash}` | 修改图像元数据 |

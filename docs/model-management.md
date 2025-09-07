@@ -26,49 +26,48 @@
 
 ### 1. GET /api/models
 
-获取可用模型列表，支持基于 OData 标准的高级查询和过滤。
+获取可用模型列表，支持基于 JSON API 标准的高级查询和过滤。
 
-📖 **查询语法详细说明**: [实体查询协议 (OData)](./entity-query-protocol.md)
+📖 **查询语法详细说明**: [实体查询协议 (JSON API)](./entity-query-protocol.md)
 
 **基础查询参数:**
 
-- `$skip` - 跳过记录数 (分页偏移，默认 0)
-- `$top` - 获取记录数 (分页大小，默认 50，最大 200)
-- `$orderby` - 排序表达式 (默认 `created_at desc`)
-- `$select` - 选择返回字段
-- `$filter` - OData 过滤表达式
+- `page[number]` - 页码 (从 1 开始，默认 1)
+- `page[size]` - 每页大小 (默认 50，最大 200)
+- `sort` - 排序表达式 (默认 `-created_at`)
+- `fields[model]` - 选择返回字段
+- `filter[field]` - JSON API 过滤表达式
+- `include` - 包含关联资源
 
-**过滤表达式示例 ($filter):**
+**过滤表达式示例 (filter):**
 
-- `type eq 'checkpoint'` - 按模型类型过滤
-- `contains(base_model, 'SD1.5')` - 按基础模型过滤
-- `contains(name, 'landscape')` - 按名称模糊搜索
-- `size ge 1000000000` - 按文件大小范围过滤
-- `rating ge 4.5` - 按评分过滤
-- `tags/any(t: t eq 'anime')` - 包含动漫标签
-- `not tags/any(t: t eq 'nsfw')` - 排除成人内容标签
-- `is_commercial eq true` - 按商用许可过滤
+- `filter[model_type]=checkpoint` - 按模型类型过滤
+- `filter[name][contains]=landscape` - 按名称模糊搜索
+- `filter[size][gte]=1000000000` - 按文件大小范围过滤
+- `filter[tags][any]=anime` - 包含动漫标签
+- `filter[tags][none]=nsfw` - 排除成人内容标签
+- `filter[base_model][in]=SD1.5,SDXL` - 按基础模型过滤
 
 **请求示例:**
 
 ```http
 # 基础查询
-GET /api/models?$filter=type eq 'checkpoint'&$top=20&$orderby=name asc
+GET /api/models?filter[model_type]=checkpoint&page[size]=20&sort=name
 
-# 标签过滤 (使用 OData lambda 表达式)
-GET /api/models?$filter=type eq 'lora' and tags/any(t: t eq 'anime') and not tags/any(t: t eq 'nsfw')&$top=20
+# 标签过滤 (使用 JSON API 过滤语法)
+GET /api/models?filter[model_type]=lora&filter[tags][any]=anime&filter[tags][none]=nsfw&page[size]=20
 
-# 大小和评分过滤
-GET /api/models?$filter=size ge 1000000000 and rating ge 4.5
+# 大小和基础模型过滤
+GET /api/models?filter[size][gte]=1000000000&filter[base_model]=SD1.5
 
 # 基础模型过滤
-GET /api/models?$filter=type eq 'checkpoint' and contains(base_model, 'SD1.5') and is_nsfw eq false
+GET /api/models?filter[model_type]=checkpoint&filter[base_model][contains]=SD1.5
 
 # 名称模糊搜索
-GET /api/models?$filter=contains(name, 'landscape') and type eq 'lora' and tags/any(t: t eq 'landscape')
+GET /api/models?filter[name][contains]=landscape&filter[model_type]=lora&filter[tags][any]=landscape
 
 # 复合查询
-GET /api/models?$filter=type eq 'checkpoint' and tags/any(t: t eq 'photorealistic') and contains(base_model, 'SDXL') and is_commercial eq true
+GET /api/models?filter[model_type]=checkpoint&filter[tags][any]=photorealistic&filter[base_model][contains]=SDXL&filter[tags][any]=commercial
 ```
 
 ### 2. GET /api/models/{model_hash}
@@ -79,19 +78,41 @@ GET /api/models?$filter=type eq 'checkpoint' and tags/any(t: t eq 'photorealisti
 
 ```json
 {
-  "hash": "abc123...",
-  "name": "stable-diffusion-v1-5",
-  "type": "checkpoint",
-  "base_model": "SD1.5",
-  "size": 4200000000,
-  "sourceUrl": "https://civitai.com/models/...",
-  "metadata": "{\"resolution\": \"512x512\", \"trigger_words\": [\"masterpiece\"], \"training_epochs\": 100}",
-  "description": "# Stable Diffusion v1.5\n\n这是一个通用的文生图模型，适合生成各种风格的图像。\n\n## 使用建议\n- 推荐分辨率：512x512\n- CFG Scale：7-12\n- 采样步数：20-50",
-  "cover_image_hash": "def456...",
-  "status": "ready",
-  "created_at": "2024-01-01T00:00:00Z",
-  "tags": ["photorealistic", "general", "portrait", "commercial"]
+  "data": {
+    "type": "model",
+    "id": "abc123...",
+    "attributes": {
+      "name": "stable-diffusion-v1-5",
+      "model_type": "checkpoint",
+      "base_model": "SD1.5",
+      "size": 4200000000,
+      "source_url": "https://civitai.com/models/...",
+      "metadata": {
+        "resolution": "512x512",
+        "trigger_words": ["masterpiece"],
+        "training_epochs": 100
+      },
+      "description": "# Stable Diffusion v1.5\n\n这是一个通用的文生图模型，适合生成各种风格的图像。\n\n## 使用建议\n- 推荐分辨率：512x512\n- CFG Scale：7-12\n- 采样步数：20-50",
+      "status": "ready",
+      "created_at": "2024-01-01T00:00:00Z",
+      "updated_at": "2024-01-01T00:00:00Z"
+    },
+    "relationships": {
+      "tags": {
+        "data": [
+          {"type": "tag", "id": "photorealistic"},
+          {"type": "tag", "id": "general"},
+          {"type": "tag", "id": "portrait"},
+          {"type": "tag", "id": "commercial"}
+        ]
+      },
+      "cover_image": {
+        "data": {"type": "image", "id": "def456..."}
+      }
+    }
+  }
 }
+```
 ```
 
 ### 3. GET /api/models/{model_hash}/content
