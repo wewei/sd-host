@@ -10,13 +10,12 @@ import os
 
 from core.database import get_db
 from services.model_service import ModelService
-from services.civitai_service import CivitaiService
 from models.schemas import (
     ModelListResponse, ModelDetailResponse, ModelFilters, PaginationParams, 
     SortParams, FieldsParams, ModelUpdateRequest, ModelBatchUpdateRequest,
-    ModelDeleteRequest, CivitaiAddRequest, ModelUpdateResponse,
+    ModelDeleteRequest, ModelUpdateResponse,
     ModelBatchUpdateResponse, ModelDeleteResponse, ModelBatchDeleteResponse,
-    CivitaiAddResponse, ErrorResponse, ErrorDetail
+    ErrorResponse, ErrorDetail
 )
 
 
@@ -241,75 +240,6 @@ async def batch_delete_models(
             deleted=result["deleted"],
             failed=result["failed"],
             count=result["count"]
-        )
-        
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal server error")
-
-
-@router.post("/add-from-civitai", response_model=CivitaiAddResponse)
-async def add_model_from_civitai(
-    request: CivitaiAddRequest,
-    db: AsyncSession = Depends(get_db)
-):
-    """Add a new model from Civitai."""
-    try:
-        civitai_service = CivitaiService(db)
-        result = await civitai_service.add_model_from_civitai(
-            request.model_id, 
-            request.version_id
-        )
-        
-        return result
-        
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        raise HTTPException(status_code=500, detail="Internal server error")
-    
-    # try:
-    #     civitai_service = CivitaiService(db)
-    #     print(f"[DEBUG] Created CivitaiService")
-    #     result = await civitai_service.add_model_from_civitai(
-    #         request.model_id, 
-    #         request.version_id
-    #     )
-    #     print(f"[DEBUG] Service returned: {result}")
-    #     
-    #     return result
-    #     
-    # except ValueError as e:
-    #     print(f"[DEBUG] ValueError: {e}")
-    #     raise HTTPException(status_code=400, detail=str(e))
-    # except Exception as e:
-    #     print(f"[DEBUG] Exception: {e}")
-    #     import traceback
-    #     traceback.print_exc()
-    #     raise HTTPException(status_code=500, detail="Internal server error")
-
-
-@router.get("/add-from-civitai/{model_hash}")
-async def track_civitai_download(
-    model_hash: str,
-    db: AsyncSession = Depends(get_db)
-):
-    """SSE endpoint for tracking Civitai download progress."""
-    try:
-        civitai_service = CivitaiService(db)
-        
-        async def generate():
-            async for data in civitai_service.get_download_progress(model_hash):
-                yield data
-        
-        return StreamingResponse(
-            generate(),
-            media_type="text/event-stream",
-            headers={
-                "Cache-Control": "no-cache",
-                "Connection": "keep-alive",
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Headers": "Cache-Control"
-            }
         )
         
     except Exception as e:

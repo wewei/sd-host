@@ -16,6 +16,7 @@ import uvicorn
 from core.database import db_manager
 from core.config import get_settings
 from api.models import router as models_router
+from api.model_actions import router as model_actions_router
 
 
 @asynccontextmanager
@@ -57,6 +58,7 @@ def create_app() -> FastAPI:
     
     # Include routers
     app.include_router(models_router)
+    app.include_router(model_actions_router)
     
     @app.get("/")
     async def root():
