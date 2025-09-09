@@ -415,3 +415,283 @@ def add_from_civitai(
         else:
             error("Download was interrupted or failed")
             info(f"You can resume tracking with: sdh models add-from-civitai --tracking {tracking_hash}")
+
+
+# ==================== Download Task Management Commands ====================
+
+@app.command("download-tasks")
+def list_download_tasks(
+    ctx: typer.Context,
+    status_filter: Optional[str] = typer.Option(None, "--status", "-s", help="Filter by status (downloading, paused, completed, failed, cancelled)"),
+):
+    """List all download tasks with their current status"""
+    cli_state = ctx.obj
+    
+    header("Download Tasks")
+    
+    data = _api_request(cli_state, "/api/models/download-tasks")
+    if not data:
+        return
+    
+    tasks = data.get("data", [])
+    
+    if not tasks:
+        info("📭 No download tasks found")
+        return
+    
+    # Filter by status if specified
+    if status_filter:
+        tasks = [t for t in tasks if t.get("status") == status_filter]
+    
+    if not tasks:
+        info(f"📭 No download tasks found with status '{status_filter}'")
+        return
+    
+    # Create tasks table
+    table = Table(title=f"Download Tasks ({len(tasks)})", show_header=True, header_style="bold cyan")
+    table.add_column("Model", style="white", width=30)
+    table.add_column("Status", style="yellow", width=12)
+    table.add_column("Progress", style="green", width=10)
+    table.add_column("Speed", style="blue", width=12)
+    table.add_column("ETA", style="magenta", width=10)
+    table.add_column("Hash", style="dim", width=16)
+    
+    for task in tasks:
+        # Format status with colors
+        status = task.get("status", "unknown")
+        status_colored = {
+            "downloading": "[green]downloading[/green]",
+            "paused": "[yellow]paused[/yellow]",
+            "completed": "[blue]completed[/blue]",
+            "failed": "[red]failed[/red]",
+            "cancelled": "[dim]cancelled[/dim]",
+        }.get(status, status)
+        
+        # Format progress
+        progress = task.get("progress", 0.0)
+        progress_str = f"{progress:.1f}%"
+        
+        # Format size info
+        model_name = task.get("model_name", "Unknown")
+        version_name = task.get("version_name", "")
+        if version_name:
+            display_name = f"{model_name}\n[dim]{version_name}[/dim]"
+        else:
+            display_name = model_name
+        
+        table.add_row(
+            display_name,
+            status_colored,
+            progress_str,
+            task.get("speed", "0 B/s"),
+            task.get("eta", "N/A"),
+            task.get("hash", "")[:16] + "..."
+        )
+    
+    console.print(table)
+    console.print()
+
+
+@app.command("download-task")
+def show_download_task(
+    ctx: typer.Context,
+    task_hash: str = typer.Argument(..., help="Download task hash"),
+):
+    """Show detailed information for a specific download task"""
+    cli_state = ctx.obj
+    
+    header(f"Download Task Details")
+    
+    data = _api_request(cli_state, f"/api/models/download-tasks/{task_hash}")
+    if not data:
+        return
+    
+    task = data.get("data")
+    if not task:
+        error("Download task not found")
+        return
+    
+    # Create details table
+    table = Table(title=f"Task: {task.get('hash', '')[:16]}...", show_header=True, header_style="bold cyan")
+    table.add_column("Property", style="cyan", width=20)
+    table.add_column("Value", style="white")
+    
+    # Format status with color
+    status = task.get("status", "unknown")
+    status_colored = {
+        "downloading": "[green]downloading[/green]",
+        "paused": "[yellow]paused[/yellow]",
+        "completed": "[blue]completed[/blue]",
+        "failed": "[red]failed[/red]",
+        "cancelled": "[dim]cancelled[/dim]",
+    }.get(status, status)
+    
+    table.add_row("Model Name", task.get("model_name", "Unknown"))
+    table.add_row("Version Name", task.get("version_name", "Unknown"))
+    table.add_row("Status", status_colored)
+    table.add_row("Progress", f"{task.get('progress', 0.0):.1f}%")
+    table.add_row("Speed", task.get("speed", "0 B/s"))
+    table.add_row("ETA", task.get("eta", "N/A"))
+    table.add_row("Size", format_bytes(task.get("size", 0)))
+    table.add_row("Downloaded", format_bytes(task.get("downloaded", 0)))
+    table.add_row("Created", task.get("created_at", "N/A"))
+    table.add_row("Hash", task.get("hash", ""))
+    
+    if task.get("error"):
+        table.add_row("Error", f"[red]{task.get('error')}[/red]")
+    
+    console.print(table)
+    console.print()
+
+
+@app.command("pause-download")
+def pause_download_task(
+    ctx: typer.Context,
+    task_hash: str = typer.Argument(..., help="Download task hash to pause"),
+):
+    """Pause a download task"""
+    cli_state = ctx.obj
+    
+    header(f"Pausing Download Task")
+    
+    data = {
+        "action": "pause"
+    }
+    
+    response = _api_post_request(cli_state, f"/api/models/download-tasks/{task_hash}/action", data)
+    if not response:
+        return
+    
+    if response.get("success"):
+        success(f"✅ {response.get('message', 'Download paused')}")
+    else:
+        error(f"❌ {response.get('message', 'Failed to pause download')}")
+
+
+@app.command("resume-download")
+def resume_download_task(
+    ctx: typer.Context,
+    task_hash: str = typer.Argument(..., help="Download task hash to resume"),
+):
+    """Resume a paused download task"""
+    cli_state = ctx.obj
+    
+    header(f"Resuming Download Task")
+    
+    data = {
+        "action": "resume"
+    }
+    
+    response = _api_post_request(cli_state, f"/api/models/download-tasks/{task_hash}/action", data)
+    if not response:
+        return
+    
+    if response.get("success"):
+        success(f"✅ {response.get('message', 'Download resumed')}")
+    else:
+        error(f"❌ {response.get('message', 'Failed to resume download')}")
+
+
+@app.command("cancel-download")
+def cancel_download_task(
+    ctx: typer.Context,
+    task_hash: str = typer.Argument(..., help="Download task hash to cancel"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force cancellation without confirmation"),
+):
+    """Cancel a download task"""
+    cli_state = ctx.obj
+    
+    header(f"Cancelling Download Task")
+    
+    if not force:
+        confirm = typer.confirm("Are you sure you want to cancel this download? This will remove the partial file.")
+        if not confirm:
+            info("Cancellation aborted")
+            return
+    
+    data = {
+        "action": "cancel"
+    }
+    
+    response = _api_post_request(cli_state, f"/api/models/download-tasks/{task_hash}/action", data)
+    if not response:
+        return
+    
+    if response.get("success"):
+        success(f"✅ {response.get('message', 'Download cancelled')}")
+    else:
+        error(f"❌ {response.get('message', 'Failed to cancel download')}")
+
+
+@app.command("remove-task")
+def remove_download_task(
+    ctx: typer.Context,
+    task_hash: str = typer.Argument(..., help="Download task hash to remove"),
+):
+    """Remove a completed, failed, or cancelled download task"""
+    cli_state = ctx.obj
+    
+    header(f"Removing Download Task")
+    
+    data = {
+        "action": "remove"
+    }
+    
+    response = _api_post_request(cli_state, f"/api/models/download-tasks/{task_hash}/action", data)
+    if not response:
+        return
+    
+    if response.get("success"):
+        success(f"✅ {response.get('message', 'Task removed')}")
+    else:
+        error(f"❌ {response.get('message', 'Failed to remove task')}")
+
+
+@app.command("clear-completed")
+def clear_completed_tasks(
+    ctx: typer.Context,
+    force: bool = typer.Option(False, "--force", "-f", help="Force clear without confirmation"),
+):
+    """Remove all completed, failed, and cancelled download tasks"""
+    cli_state = ctx.obj
+    
+    header(f"Clearing Completed Tasks")
+    
+    if not force:
+        confirm = typer.confirm("Are you sure you want to remove all completed/failed/cancelled tasks?")
+        if not confirm:
+            info("Operation aborted")
+            return
+    
+    response = _api_delete_request(cli_state, "/api/models/download-tasks/completed")
+    if not response:
+        return
+    
+    if response.get("success"):
+        count = response.get("count", 0)
+        success(f"✅ Removed {count} completed tasks")
+    else:
+        error(f"❌ {response.get('message', 'Failed to clear completed tasks')}")
+
+
+def _api_delete_request(cli_state: CLIState, endpoint: str) -> Optional[Dict[str, Any]]:
+    """Make a DELETE request to the API"""
+    from .service import _is_service_running
+    
+    if not _is_service_running(cli_state):
+        error("Service is not running")
+        info("Start the service with: sdh service start")
+        return None
+    
+    try:
+        response = requests.delete(f"{cli_state.api_base}{endpoint}", timeout=30)
+        if response.status_code in [200, 202, 204]:
+            return response.json() if response.text else {"success": True}
+        else:
+            error(f"API request failed: {response.status_code}")
+            if response.text:
+                error(f"Response: {response.text}")
+            return None
+    except requests.exceptions.RequestException as e:
+        error(f"Connection error: {e}")
+        return None

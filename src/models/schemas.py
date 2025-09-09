@@ -259,3 +259,59 @@ class ErrorDetail(BaseModel):
 class ErrorResponse(BaseModel):
     """JSON API error response"""
     errors: List[ErrorDetail]
+
+
+# Download Task Management Schemas
+class DownloadTaskResource(BaseModel):
+    """Download task resource representation"""
+    type: str = "download_task"
+    hash: str
+    status: str
+    progress: float = 0.0
+    speed: str = "0 B/s"
+    eta: str = "calculating..."
+    model_name: str = "Unknown"
+    version_name: str = "Unknown"
+    size: int = 0
+    downloaded: int = 0
+    created_at: Optional[str] = None
+    error: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class DownloadTaskListResponse(BaseModel):
+    """Response schema for download task list"""
+    data: List[DownloadTaskResource]
+    meta: Dict[str, Any] = {}
+
+
+class DownloadTaskDetailResponse(BaseModel):
+    """Response schema for single download task"""
+    data: DownloadTaskResource
+
+
+class DownloadTaskActionRequest(BaseModel):
+    """Request schema for download task actions"""
+    action: str  # pause, resume, cancel, remove
+
+
+class DownloadTaskActionResponse(BaseModel):
+    """Response schema for download task actions"""
+    success: bool
+    message: str
+    data: Optional[DownloadTaskResource] = None
+
+
+class DownloadTaskBatchActionRequest(BaseModel):
+    """Request schema for batch download task actions"""
+    task_hashes: List[str]
+    action: str  # pause, resume, cancel, remove
+
+
+class DownloadTaskBatchActionResponse(BaseModel):
+    """Response schema for batch download task actions"""
+    success: bool
+    message: str
+    results: List[Dict[str, Any]]  # [{hash: str, success: bool, message: str}]

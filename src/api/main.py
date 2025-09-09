@@ -28,6 +28,18 @@ async def lifespan(app: FastAPI):
     await db_manager.create_tables()
     print("Database tables created/verified")
     
+    # Initialize download task recovery
+    try:
+        from services.civitai_service import CivitaiService
+        
+        async with db_manager.get_session() as session:
+            civitai_service = CivitaiService(session)
+            await civitai_service.initialize_from_database()
+            await civitai_service.resume_existing_downloads()
+            print("Download task recovery completed")
+    except Exception as e:
+        print(f"Error during download task recovery: {e}")
+    
     yield
     
     # Shutdown

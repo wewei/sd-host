@@ -18,6 +18,9 @@ from models.schemas import (
     ModelDeleteRequest, ModelUpdateResponse,
     ModelBatchUpdateResponse, ModelDeleteResponse, ModelBatchDeleteResponse,
     CivitaiAddRequest, CivitaiAddResponse,
+    DownloadTaskListResponse, DownloadTaskDetailResponse, DownloadTaskResource,
+    DownloadTaskActionRequest, DownloadTaskActionResponse,
+    DownloadTaskBatchActionRequest, DownloadTaskBatchActionResponse,
     ErrorResponse, ErrorDetail
 )
 
@@ -94,6 +97,245 @@ async def get_models(
         
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+# ==================== Download Task Management Endpoints ====================
+# Note: These routes must come BEFORE /{model_hash} to avoid conflicts
+
+@router.get("/download-tasks", response_model=DownloadTaskListResponse)
+async def list_download_tasks(
+    db: AsyncSession = Depends(get_db)
+):
+    """Get all download tasks with their current status"""
+    try:
+        civitai_service = CivitaiService(db)
+        await civitai_service.initialize_from_database()
+        tasks = await civitai_service.get_all_download_tasks()
+        
+        task_resources = [
+            DownloadTaskResource(
+                hash=task["hash"],
+                status=task["status"],
+                progress=task["progress"],
+                speed=task["speed"],
+                eta=task["eta"],
+                model_name=task["model_name"],
+                version_name=task["version_name"],
+                size=task["size"],
+                downloaded=task["downloaded"],
+                created_at=task["created_at"],
+                error=task["error"]
+            )
+            for task in tasks
+        ]
+        
+        return DownloadTaskListResponse(
+            data=task_resources,
+            meta={"count": len(task_resources)}
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.get("/download-tasks/{task_hash}", response_model=DownloadTaskDetailResponse)
+async def get_download_task(
+    task_hash: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """Get a specific download task by hash"""
+    try:
+        civitai_service = CivitaiService(db)
+        await civitai_service.initialize_from_database()
+        task = await civitai_service.get_download_task(task_hash)
+        
+        if not task:
+            raise HTTPException(status_code=404, detail="Download task not found")
+        
+        task_resource = DownloadTaskResource(
+            hash=task["hash"],
+            status=task["status"],
+            progress=task["progress"],
+            speed=task["speed"],
+            eta=task["eta"],
+            model_name=task["model_name"],
+            version_name=task["version_name"],
+            size=task["size"],
+            downloaded=task["downloaded"],
+            created_at=task["created_at"],
+            error=task["error"]
+        )
+        
+        return DownloadTaskDetailResponse(data=task_resource)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/download-tasks/{task_hash}/action", response_model=DownloadTaskActionResponse)
+async def control_download_task(
+    task_hash: str,
+    request: DownloadTaskActionRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Perform action on a download task (pause, resume, cancel, remove)"""
+    try:
+        civitai_service = CivitaiService(db)
+        await civitai_service.initialize_from_database()
+        action = request.action.lower()
+        
+        success = False
+        message = ""
+        
+        if action == "pause":
+            success = await civitai_service.pause_download_task(task_hash)
+            message = "Download paused" if success else "Failed to pause download"
+        elif action == "resume":
+            success = await civitai_service.resume_download_task(task_hash)
+            message = "Download resumed" if success else "Failed to resume download"
+        elif action == "cancel":
+            success = await civitai_service.cancel_download_task(task_hash)
+            message = "Download cancelled" if success else "Failed to cancel download"
+        elif action == "remove":
+            success = await civitai_service.remove_download_task(task_hash)
+            message = "Task removed" if success else "Failed to remove task"
+        else:
+            raise HTTPException(status_code=400, detail="Invalid action. Use: pause, resume, cancel, or remove")
+        
+        if not success:
+            raise HTTPException(status_code=400, detail=message)
+        
+        # Get updated task info
+        task = await civitai_service.get_download_task(task_hash)
+        task_resource = None
+        if task:
+            task_resource = DownloadTaskResource(
+                hash=task["hash"],
+                status=task["status"],
+                progress=task["progress"],
+                speed=task["speed"],
+                eta=task["eta"],
+                model_name=task["model_name"],
+                version_name=task["version_name"],
+                size=task["size"],
+                downloaded=task["downloaded"],
+                created_at=task["created_at"],
+                error=task["error"]
+            )
+        
+        return DownloadTaskActionResponse(
+            success=True,
+            message=message,
+            data=task_resource
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/download-tasks/batch-action", response_model=DownloadTaskBatchActionResponse)
+async def batch_control_download_tasks(
+    request: DownloadTaskBatchActionRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """Perform batch action on multiple download tasks"""
+    try:
+        civitai_service = CivitaiService(db)
+        await civitai_service.initialize_from_database()
+        action = request.action.lower()
+        results = []
+        
+        for task_hash in request.task_hashes:
+            try:
+                success = False
+                message = ""
+                
+                if action == "pause":
+                    success = civitai_service.pause_download_task(task_hash)
+                    message = "Download paused" if success else "Failed to pause download"
+                elif action == "resume":
+                    success = civitai_service.resume_download_task(task_hash)
+                    message = "Download resumed" if success else "Failed to resume download"
+                elif action == "cancel":
+                    success = civitai_service.cancel_download_task(task_hash)
+                    message = "Download cancelled" if success else "Failed to cancel download"
+                elif action == "remove":
+                    success = civitai_service.remove_download_task(task_hash)
+                    message = "Task removed" if success else "Failed to remove task"
+                else:
+                    success = False
+                    message = "Invalid action"
+                
+                results.append({
+                    "hash": task_hash,
+                    "success": success,
+                    "message": message
+                })
+                
+            except Exception as e:
+                results.append({
+                    "hash": task_hash,
+                    "success": False,
+                    "message": str(e)
+                })
+        
+        overall_success = all(result["success"] for result in results)
+        successful_count = sum(1 for result in results if result["success"])
+        
+        return DownloadTaskBatchActionResponse(
+            success=overall_success,
+            message=f"Processed {successful_count}/{len(results)} tasks successfully",
+            results=results
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.delete("/download-tasks/completed")
+async def clear_completed_download_tasks(
+    db: AsyncSession = Depends(get_db)
+):
+    """Remove all completed, failed, and cancelled download tasks"""
+    try:
+        civitai_service = CivitaiService(db)
+        await civitai_service.initialize_from_database()
+        removed_count = await civitai_service.clear_completed_tasks()
+        
+        return {
+            "success": True,
+            "message": f"Removed {removed_count} completed tasks",
+            "count": removed_count
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/download-tasks/mock")
+async def create_mock_download_task(
+    db: AsyncSession = Depends(get_db),
+    model_name: str = "Test Model",
+    version_name: str = "v1.0"
+):
+    """Create a mock download task for testing purposes"""
+    try:
+        civitai_service = CivitaiService(db)
+        await civitai_service.initialize_from_database()
+        task_hash = await civitai_service.create_mock_download_task(model_name, version_name)
+        
+        return {
+            "success": True,
+            "message": "Mock download task created",
+            "hash": task_hash
+        }
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal server error")
 

@@ -270,3 +270,106 @@ class ImageTag(Base):
         Index("idx_image_tags_tag", "tag_name"),
         Index("idx_image_tags_created_at", "created_at"),
     )
+
+
+class DownloadTask(Base):
+    """Download task entity for tracking model downloads with resume capability"""
+    
+    __tablename__ = "download_tasks"
+    
+    # Primary key - task hash (SHA256 of model + url)
+    hash = Column(String, primary_key=True)
+    
+    # Target model info
+    model_hash = Column(String, nullable=True)  # Will be populated when download completes
+    model_name = Column(String, nullable=False)
+    version_name = Column(String, nullable=True)
+    model_type = Column(String, nullable=True)  # checkpoint, lora, etc.
+    
+    # Download source
+    source_url = Column(Text, nullable=False)
+    source_type = Column(String, nullable=False, default="civitai")  # civitai, huggingface, etc.
+    
+    # Download progress
+    status = Column(String, nullable=False, default="pending")  # pending, downloading, paused, completed, failed, cancelled
+    total_size = Column(Integer, nullable=True)     # Total file size in bytes
+    downloaded_size = Column(Integer, nullable=False, default=0)  # Downloaded bytes
+    resume_position = Column(Integer, nullable=False, default=0)  # Position for resume
+    
+    # Speed and timing
+    download_speed = Column(Float, nullable=True)   # Current speed in bytes/sec
+    eta_seconds = Column(Integer, nullable=True)    # Estimated time remaining
+    
+    # File management
+    temp_file_path = Column(Text, nullable=True)    # Temporary download file path
+    final_file_path = Column(Text, nullable=True)   # Final model file path
+    
+    # Metadata
+    civitai_model_id = Column(Integer, nullable=True)
+    civitai_version_id = Column(Integer, nullable=True)
+    download_metadata = Column(Text, nullable=True)  # JSON metadata
+    error_message = Column(Text, nullable=True)      # Error details if failed
+    
+    # Retry management
+    retry_count = Column(Integer, nullable=False, default=0)
+    max_retries = Column(Integer, nullable=False, default=3)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    started_at = Column(DateTime, nullable=True)     # When download actually started
+    completed_at = Column(DateTime, nullable=True)   # When download completed
+    
+    # Check constraints
+    __table_args__ = (
+        CheckConstraint("status IN ('pending', 'downloading', 'paused', 'completed', 'failed', 'cancelled')", name="chk_download_status"),
+        CheckConstraint("downloaded_size >= 0", name="chk_downloaded_size"),
+        CheckConstraint("resume_position >= 0", name="chk_resume_position"),
+        CheckConstraint("total_size IS NULL OR total_size > 0", name="chk_total_size"),
+        CheckConstraint("retry_count >= 0", name="chk_retry_count"),
+        CheckConstraint("max_retries >= 0", name="chk_max_retries"),
+        Index("idx_download_tasks_status", "status"),
+        Index("idx_download_tasks_model_hash", "model_hash"),
+        Index("idx_download_tasks_created_at", "created_at"),
+        Index("idx_download_tasks_source_type", "source_type"),
+        Index("idx_download_tasks_civitai_model", "civitai_model_id"),
+    )
+    
+    @property
+    def progress_percentage(self) -> float:
+        """Calculate download progress percentage"""
+        if not self.total_size or self.total_size == 0:
+            return 0.0
+        return min(100.0, (self.downloaded_size / self.total_size) * 100.0)
+    
+    @property
+    def is_resumable(self) -> bool:
+        """Check if this download can be resumed"""
+        return (
+            self.status in ['paused', 'failed'] and 
+            self.temp_file_path and 
+            self.resume_position > 0 and
+            self.retry_count < self.max_retries
+        )
+    
+    def get_download_metadata_dict(self) -> dict:
+        """Parse download metadata JSON string to dict"""
+        if self.download_metadata:
+            try:
+                return json.loads(self.download_metadata)
+            except json.JSONDecodeError:
+                return {}
+        return {}
+    
+    def set_download_metadata_dict(self, metadata_dict: dict):
+        """Set download metadata from dict"""
+        self.download_metadata = json.dumps(metadata_dict) if metadata_dict else None
+    
+    def can_retry(self) -> bool:
+        """Check if download can be retried"""
+        return self.retry_count < self.max_retries
+    
+    def increment_retry(self):
+        """Increment retry counter"""
+        self.retry_count += 1
+        self.updated_at = func.now()
