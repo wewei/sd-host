@@ -37,7 +37,7 @@ class SDHostCLI:
         # CLI is in src/cli/ subdirectory, so project root is two levels up
         self.project_dir = Path(__file__).parent.parent.parent.absolute()
         self.python_exe = self.project_dir / "venv" / "Scripts" / "python.exe"
-        self.main_script = self.project_dir / "src" / "main.py"
+        self.main_script = self.project_dir / "src" / "api" / "main.py"
         self.pid_file = self.project_dir / ".sdh.pid"
         self.log_file = self.project_dir / "logs" / "sdh.log"
         self.api_base = "http://localhost:8000"

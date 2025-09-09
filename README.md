@@ -9,25 +9,53 @@ A cross-platform Python web service that provides RESTful APIs for Stable Diffus
 - 🚀 High-performance image generation
 - 📊 Request tracking and history
 - 🔧 Easy configuration and deployment
+- 💻 Command-line interface for management
+
+## Architecture
+
+The project follows a layered architecture design:
+
+```
+api & cli --depends on--> core --depends on--> models
+```
+
+- **`models/`**: Data access layer - Database models, ORM, data persistence
+- **`core/`**: Business logic layer - Core functionality, services, domain logic
+- **`api/`**: HTTP interface layer - REST API endpoints, request/response handling
+- **`cli/`**: Command-line interface layer - CLI tools for management and monitoring
+
+For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Project Structure
 
 ```
 sd-host/
 ├── src/                    # Source code
-│   ├── api/               # API endpoints
-│   ├── core/              # Core Stable Diffusion logic
-│   ├── models/            # Data models
-│   ├── services/          # Business logic services
+│   ├── api/               # HTTP API layer
+│   │   ├── main.py        # FastAPI application entry point
+│   │   └── __init__.py    # API module
+│   ├── cli/               # Command-line interface layer
+│   │   ├── sdh.py         # CLI implementation
+│   │   └── README.md      # CLI documentation
+│   ├── core/              # Business logic layer
+│   │   └── __init__.py    # Core module
+│   ├── models/            # Data access layer
+│   │   └── __init__.py    # Models module
+│   ├── services/          # Legacy services (to be refactored into core/)
 │   └── utils/             # Utility functions
-├── config/                # Configuration files
-├── tests/                 # Test files
-├── scripts/               # Deployment and utility scripts
-├── requirements/          # Requirements files
-├── models/                # Model files (gitignored)
-├── output/                # Generated images (gitignored)
-├── data/                  # SQLite database files (gitignored)
-└── docs/                  # Documentation
+├── bin/                   # Executable scripts
+│   ├── sdh.bat           # Windows CLI launcher
+│   └── sdh               # Unix/Linux/macOS CLI launcher
+├── config/               # Configuration files
+├── tests/                # Test files
+├── scripts/              # Deployment and utility scripts
+├── requirements/         # Requirements files
+├── models/               # Model files (gitignored)
+├── output/               # Generated images (gitignored)
+├── data/                 # SQLite database files (gitignored)
+├── docs/                 # Documentation
+├── CLI.md               # CLI overview
+└── sdh.bat              # Root CLI shortcut
 ```
 
 ## Quick Start
@@ -69,10 +97,28 @@ cp config/config.example.yml config/config.yml
 # Edit config/config.yml according to your needs
 ```
 
-5. Run the service:
+5. Run the API service:
 ```bash
-python src/main.py
+python src/api/main.py
 ```
+
+## Command Line Interface
+
+SD-Host includes a comprehensive CLI tool for service management:
+
+```bash
+# Service management
+./bin/sdh service status     # Check service status
+./bin/sdh service start      # Start the service
+./bin/sdh service stop       # Stop the service
+./bin/sdh service restart    # Restart the service
+
+# Models management
+./bin/sdh models list        # List all models
+./bin/sdh models status      # Show models overview
+```
+
+For detailed CLI documentation, see [CLI.md](CLI.md).
 
 ## API Documentation
 

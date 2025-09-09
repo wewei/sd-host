@@ -1,13 +1,13 @@
 """
-Main entry point for SD-Host application
+Main entry point for SD-Host API application
 """
 
 import sys
 import os
 from contextlib import asynccontextmanager
 
-# Add src to Python path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__)))
+# Add src to Python path (API is in src/api/, so go up one level to src/)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
