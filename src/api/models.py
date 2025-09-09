@@ -135,7 +135,9 @@ async def get_model_content(
             raise HTTPException(status_code=404, detail="Model not found")
         
         # Check if file exists
-        model_path = f"./models/{model_hash}.safetensors"
+        from core.config import get_settings
+        settings = get_settings()
+        model_path = os.path.join(settings.models_dir, f"{model_hash}.safetensors")
         if not os.path.exists(model_path):
             raise HTTPException(status_code=404, detail="Model file not found")
         

@@ -7,6 +7,7 @@ from sqlalchemy.orm import DeclarativeBase
 from typing import AsyncGenerator
 import aiosqlite
 import os
+from pathlib import Path
 
 
 class Base(DeclarativeBase):
@@ -19,9 +20,21 @@ class DatabaseManager:
     
     def __init__(self, database_url: str = None):
         if database_url is None:
-            # Default database path
-            database_url = "sqlite+aiosqlite:///./data/sd_host.db"
+            # Use configuration to get database URL
+            import sys
+            import os
+            sys.path.insert(0, os.path.dirname(__file__))
+            from config import get_settings
+            settings = get_settings()
+            database_url = settings.database_url
+            
+            # Ensure database directory exists
+            if database_url.startswith("sqlite"):
+                # Extract path from SQLite URL
+                db_path = database_url.replace("sqlite+aiosqlite:///", "")
+                Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         
+        self.database_url = database_url
         self.engine = create_async_engine(
             database_url,
             echo=False,  # Set to True for SQL debugging

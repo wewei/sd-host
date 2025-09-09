@@ -1,0 +1,125 @@
+# SD-Host Default Configuration Template
+# This is a template for the user configuration file
+# The actual config will be placed at ~/sd-host/config.yml
+
+# Application metadata
+app_name: "SD-Host"
+app_version: "0.1.0"
+
+# Server configuration
+server:
+  host: "0.0.0.0"
+  port: 8000
+  debug: false
+  workers: 1
+  reload: false
+
+# Stable Diffusion configuration
+stable_diffusion:
+  # Model configuration
+  model_name: "runwayml/stable-diffusion-v1-5"
+  # model_path will be auto-set to {depot}/models/{model_name}
+  
+  # Device configuration
+  device: "auto"  # auto, cuda, cpu
+  device_id: 0    # GPU device ID (for multi-GPU systems)
+  
+  # Performance settings
+  precision: "fp16"  # fp16, fp32
+  attention_slicing: true
+  memory_efficient_attention: true
+  cpu_offload: false
+  
+  # Generation defaults
+  default_width: 512
+  default_height: 512
+  default_steps: 20
+  default_cfg_scale: 7.5
+  default_sampler: "DPMSolverMultistepScheduler"
+  
+  # Safety settings
+  safety_checker: true
+  nsfw_filter: true
+
+# Storage configuration
+storage:
+  # Depot directory - root for all SD-Host data
+  # Can be overridden by SDH_DEPOT environment variable or --depot CLI argument
+  # depot_dir: "/path/to/custom/depot"  # Uncomment to override default
+  
+  # Subdirectories (will be auto-set relative to depot_dir if not specified)
+  # models_dir: "{depot}/models"
+  # output_dir: "{depot}/output" 
+  # data_dir: "{depot}/data"
+  # database_url: "sqlite+aiosqlite:///{depot}/data/sd_host.db"
+  
+  # Image retention settings
+  max_images: 1000
+  cleanup_interval: 3600  # seconds
+  image_retention_days: 7
+
+# API configuration
+api:
+  # Rate limiting
+  rate_limit_requests: 10
+  rate_limit_window: 60  # seconds
+  
+  # Request timeout
+  timeout: 300  # seconds
+  
+  # Maximum request size
+  max_request_size: 10485760  # 10MB
+  
+  # CORS settings
+  cors_origins: ["*"]
+  cors_methods: ["GET", "POST", "PUT", "DELETE"]
+  cors_headers: ["*"]
+  
+  # API prefix
+  api_prefix: "/api"
+
+# Civitai configuration
+civitai:
+  api_key: "c166827d7f1cda8cd073aeb2796552ae"  # Default public API key
+  base_url: "https://civitai.com/api/v1"
+
+# Proxy configuration (if needed)
+proxy:
+  # http_proxy: "http://proxy.example.com:8080"
+  # https_proxy: "https://proxy.example.com:8080"
+
+# Logging configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "structured"  # structured, simple
+  # file will be auto-set to {depot}/logs/sd_host.log if not specified
+  max_size: 10485760  # 10MB
+  backup_count: 5
+
+# Security configuration
+security:
+  # API key authentication (optional)
+  api_key_enabled: false
+  api_key: ""
+  
+  # HTTPS settings
+  ssl_enabled: false
+  ssl_cert_file: ""
+  ssl_key_file: ""
+
+# Monitoring configuration
+monitoring:
+  # Health check endpoint
+  health_check_enabled: true
+  
+  # Metrics collection
+  metrics_enabled: false
+  metrics_endpoint: "/metrics"
+  
+  # Performance monitoring
+  track_performance: true
+
+# File handling configuration
+file:
+  max_file_size: 10737418240  # 10GB
+  allowed_extensions: [".safetensors", ".ckpt", ".pt", ".bin", ".pth"]

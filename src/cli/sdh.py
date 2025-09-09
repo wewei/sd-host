@@ -19,6 +19,8 @@ from datetime import datetime
 # Add src to Python path for imports (CLI is in src/cli/ subdirectory)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
+from core.config import get_settings, reload_settings, get_config_file_path
+
 class Colors:
     """ANSI color codes for terminal output"""
     GREEN = '\033[92m'
@@ -33,17 +35,23 @@ class Colors:
 class SDHostCLI:
     """SD-Host CLI management tool"""
     
-    def __init__(self):
+    def __init__(self, depot_dir: Optional[str] = None, config_path: Optional[str] = None):
         # CLI is in src/cli/ subdirectory, so project root is two levels up
         self.project_dir = Path(__file__).parent.parent.parent.absolute()
         self.python_exe = self.project_dir / "venv" / "Scripts" / "python.exe"
         self.main_script = self.project_dir / "src" / "api" / "main.py"
-        self.pid_file = self.project_dir / ".sdh.pid"
-        self.log_file = self.project_dir / "logs" / "sdh.log"
-        self.api_base = "http://localhost:8000"
         
-        # Ensure logs directory exists
-        self.log_file.parent.mkdir(exist_ok=True)
+        # Load configuration with depot override
+        self.settings = get_settings(config_path, depot_dir)
+        
+        # Set up paths based on configuration
+        self.pid_file = Path(self.settings.depot_dir) / ".sdh.pid"
+        self.log_file = Path(self.settings.logging.file)
+        self.api_base = f"http://{self.settings.host}:{self.settings.port}"
+        
+        # Ensure directories exist
+        self.log_file.parent.mkdir(parents=True, exist_ok=True)
+        Path(self.settings.depot_dir).mkdir(parents=True, exist_ok=True)
     
     def print_status(self, message: str, status: str = "info"):
         """Print colored status message"""
@@ -372,6 +380,144 @@ class SDHostCLI:
         self.print_header("Images List")
         self.print_status("🚧 Images feature coming soon...", "warning")
     
+    def show_config(self):
+        """Show current configuration"""
+        self.print_header("SD-Host Configuration")
+        
+        # Show depot information
+        print(f"{Colors.CYAN}📁 Depot Directory:{Colors.END}")
+        print(f"   {self.settings.depot_dir}")
+        print()
+        
+        print(f"{Colors.CYAN}📂 Data Directories:{Colors.END}")
+        print(f"   Models: {self.settings.models_dir}")
+        print(f"   Output: {self.settings.output_dir}")
+        print(f"   Data:   {self.settings.data_dir}")
+        print()
+        
+        print(f"{Colors.CYAN}🌐 Server Configuration:{Colors.END}")
+        print(f"   Host: {self.settings.host}")
+        print(f"   Port: {self.settings.port}")
+        print(f"   Debug: {self.settings.debug}")
+        print()
+        
+        print(f"{Colors.CYAN}🗃️  Database:{Colors.END}")
+        print(f"   URL: {self.settings.database_url}")
+        print()
+        
+        print(f"{Colors.CYAN}📝 Configuration File:{Colors.END}")
+        config_path = get_config_file_path()
+        if config_path.exists():
+            print(f"   {config_path} {Colors.GREEN}(exists){Colors.END}")
+        else:
+            print(f"   {config_path} {Colors.YELLOW}(using defaults){Colors.END}")
+    
+    def show_config_path(self):
+        """Show configuration file path"""
+        config_path = get_config_file_path()
+        print(f"Configuration file: {config_path}")
+        if config_path.exists():
+            print(f"Status: {Colors.GREEN}exists{Colors.END}")
+        else:
+            print(f"Status: {Colors.YELLOW}not found (using defaults){Colors.END}")
+    
+    def init_config(self):
+        """Initialize configuration file"""
+        from core.config import save_config
+        
+        config_path = get_config_file_path()
+        
+        if config_path.exists():
+            print(f"{Colors.YELLOW}Configuration file already exists at:{Colors.END}")
+            print(f"  {config_path}")
+            print()
+            response = input("Overwrite existing configuration? [y/N]: ")
+            if response.lower() not in ['y', 'yes']:
+                print("Configuration initialization cancelled.")
+                return
+        
+        try:
+            # Create configuration with current settings
+            save_config(self.settings)
+            print(f"{Colors.GREEN}✅ Configuration file created successfully:{Colors.END}")
+            print(f"  {config_path}")
+            print()
+            print(f"{Colors.CYAN}📁 Depot directory:{Colors.END} {self.settings.depot_dir}")
+            print()
+            print("You can now edit the configuration file to customize your settings.")
+            
+        except Exception as e:
+            print(f"{Colors.RED}❌ Failed to create configuration file:{Colors.END}")
+            print(f"  Error: {e}")
+    
+    def show_help(self):
+        """Show detailed help information"""
+        help_text = f"""
+{Colors.BOLD}{Colors.CYAN}SD-Host CLI Tool (sdh){Colors.END}
+
+{Colors.BOLD}DESCRIPTION:{Colors.END}
+    Command-line interface for managing SD-Host service and querying status.
+    
+{Colors.BOLD}GLOBAL OPTIONS:{Colors.END}
+    --depot, -d PATH     Specify depot directory (overrides SDH_DEPOT env var)
+    --config, -c PATH    Specify configuration file path
+    --version            Show version information
+    --help               Show this help message
+
+{Colors.BOLD}DEPOT MANAGEMENT:{Colors.END}
+    The depot is the root directory where SD-Host stores all its data:
+    - models/    Model files (.safetensors, .ckpt, etc.)
+    - output/    Generated images and outputs
+    - data/      Database and application data
+    - logs/      Application logs
+    
+    Depot location priority:
+    1. --depot command line argument
+    2. SDH_DEPOT environment variable  
+    3. Default: ~/sd-host/depot
+
+{Colors.BOLD}CONFIGURATION:{Colors.END}
+    Configuration file: ~/sd-host/config.yml
+    
+    sdh config init      - Create initial configuration file
+    sdh config show      - Show current configuration
+    sdh config path      - Show configuration file path
+
+{Colors.BOLD}SERVICE MANAGEMENT:{Colors.END}
+    sdh service status   - Show service status and system info
+    sdh service start    - Start SD-Host API service
+    sdh service stop     - Stop SD-Host API service  
+    sdh service restart  - Restart SD-Host API service
+
+{Colors.BOLD}MODELS MANAGEMENT:{Colors.END}
+    sdh models list      - List all available models
+    sdh models status    - Show models overview and usage
+
+{Colors.BOLD}IMAGES MANAGEMENT:{Colors.END}
+    sdh images list      - List all images (coming soon)
+
+{Colors.BOLD}TASKS MANAGEMENT:{Colors.END}
+    sdh tasks list       - List all tasks (coming soon)
+    sdh tasks status     - Show tasks overview (coming soon)
+
+{Colors.BOLD}EXAMPLES:{Colors.END}
+    # Use custom depot location
+    sdh --depot /path/to/my/depot service start
+    
+    # Initialize configuration
+    sdh config init
+    
+    # Check service status  
+    sdh service status
+    
+    # List models with custom depot
+    SDH_DEPOT=/custom/path sdh models list
+
+{Colors.BOLD}ENVIRONMENT VARIABLES:{Colors.END}
+    SDH_DEPOT            Depot directory path
+        """
+        print(help_text)
+    
     def _colored_status(self, status: str) -> str:
         """Return colored status string"""
         colors = {
@@ -382,38 +528,6 @@ class SDHostCLI:
         }
         color = colors.get(status, Colors.WHITE)
         return f"{color}{status}{Colors.END}"
-    
-    def show_help(self):
-        """Display help information"""
-        self.print_header("SD-Host CLI (sdh) - Help")
-        
-        help_text = """
-🔧 Service Management:
-   sdh service status    - Show service status
-   sdh service start     - Start the service
-   sdh service stop      - Stop the service
-   sdh service restart   - Restart the service
-
-📦 Models Management:
-   sdh models list       - List all models
-   sdh models status     - Show models overview
-
-🖼️  Images Management:
-   sdh images list       - List all images (coming soon)
-
-⚙️  Tasks Management:
-   sdh tasks list        - List all tasks (coming soon)
-   sdh tasks status      - Show tasks overview (coming soon)
-
-📝 General:
-   sdh --help           - Show this help
-   sdh --version        - Show version information
-
-🌐 Web Interface:
-   Access the web API at: http://localhost:8000
-   API Documentation: http://localhost:8000/docs
-        """
-        print(help_text)
 
 def main():
     """Main CLI entry point"""
@@ -423,6 +537,8 @@ def main():
     )
     
     parser.add_argument("--version", action="version", version="sdh 1.0.0")
+    parser.add_argument("--depot", "-d", type=str, help="Depot directory path (overrides SDH_DEPOT env var)")
+    parser.add_argument("--config", "-c", type=str, help="Configuration file path")
     
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
     
@@ -446,6 +562,11 @@ def main():
     tasks_parser.add_argument("action", choices=["list", "status"], 
                              help="Tasks action")
     
+    # Config management
+    config_parser = subparsers.add_parser("config", help="Configuration management")
+    config_parser.add_argument("action", choices=["show", "path", "init"], 
+                              help="Config action")
+    
     args = parser.parse_args()
     
     # If no command provided, show help
@@ -453,7 +574,7 @@ def main():
         parser.print_help()
         return
     
-    cli = SDHostCLI()
+    cli = SDHostCLI(depot_dir=args.depot, config_path=args.config)
     
     # Handle commands
     if args.command == "service":
@@ -481,6 +602,14 @@ def main():
             cli.show_tasks_list()
         elif args.action == "status":
             cli.show_tasks_status()
+    
+    elif args.command == "config":
+        if args.action == "show":
+            cli.show_config()
+        elif args.action == "path":
+            cli.show_config_path()
+        elif args.action == "init":
+            cli.init_config()
 
 if __name__ == "__main__":
     main()

@@ -11,6 +11,7 @@ import hashlib
 import os
 from datetime import datetime
 
+from core.config import get_settings
 from models.entities import Model, ModelTag, Tag, Image
 from models.schemas import (
     ModelResource, ModelListResponse, ModelDetailResponse,
@@ -406,7 +407,7 @@ class ModelService:
     
     async def _delete_model_file(self, model_hash: str):
         """Delete model file from filesystem"""
-        # This is a placeholder - implement actual file deletion logic
-        model_path = f"./models/{model_hash}.safetensors"
+        settings = get_settings()
+        model_path = os.path.join(settings.models_dir, f"{model_hash}.safetensors")
         if os.path.exists(model_path):
             os.remove(model_path)

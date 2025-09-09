@@ -24,8 +24,8 @@ class CivitaiService:
     def __init__(self, session: AsyncSession):
         self.session = session
         self.settings = get_settings()
-        self.base_url = self.settings.civitai_base_url
-        self.api_key = self.settings.civitai_api_key
+        self.base_url = self.settings.civitai.base_url
+        self.api_key = self.settings.civitai.api_key
         self.download_sessions: Dict[str, Dict[str, Any]] = {}
     
     def _get_proxy_config(self) -> Dict[str, str]:
@@ -33,10 +33,10 @@ class CivitaiService:
         proxy_config = {}
         
         # Check settings first
-        if self.settings.http_proxy:
-            proxy_config["http"] = self.settings.http_proxy
-        if self.settings.https_proxy:
-            proxy_config["https"] = self.settings.https_proxy
+        if self.settings.proxy.http_proxy:
+            proxy_config["http"] = self.settings.proxy.http_proxy
+        if self.settings.proxy.https_proxy:
+            proxy_config["https"] = self.settings.proxy.https_proxy
         
         # Fall back to environment variables
         if not proxy_config.get("http"):
@@ -278,7 +278,7 @@ class CivitaiService:
             }
             
             # Create models directory if it doesn't exist
-            models_dir = "./models"
+            models_dir = self.settings.models_dir
             os.makedirs(models_dir, exist_ok=True)
             
             # Download file
@@ -315,9 +315,9 @@ class CivitaiService:
             # Use hash as filename if available, otherwise use original filename
             expected_hash = download_info.get("hash")
             if expected_hash:
-                file_path = os.path.join("./models", f"{expected_hash}.safetensors")
+                file_path = os.path.join(self.settings.models_dir, f"{expected_hash}.safetensors")
             else:
-                file_path = os.path.join("./models", filename)
+                file_path = os.path.join(self.settings.models_dir, filename)
             
             downloaded_size = 0
             start_time = datetime.utcnow()
@@ -377,7 +377,7 @@ class CivitaiService:
             
             # Rename file to use actual hash
             if not expected_hash:
-                new_path = os.path.join("./models", f"{file_hash}.safetensors")
+                new_path = os.path.join(self.settings.models_dir, f"{file_hash}.safetensors")
                 os.rename(file_path, new_path)
                 print(f"File renamed to: {new_path}")
             
