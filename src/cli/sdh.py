@@ -381,36 +381,118 @@ class SDHostCLI:
         self.print_status("🚧 Images feature coming soon...", "warning")
     
     def show_config(self):
-        """Show current configuration"""
+        """Show current configuration as key-value pairs"""
         self.print_header("SD-Host Configuration")
         
-        # Show depot information
-        print(f"{Colors.CYAN}📁 Depot Directory:{Colors.END}")
-        print(f"   {self.settings.depot_dir}")
-        print()
-        
-        print(f"{Colors.CYAN}📂 Data Directories:{Colors.END}")
-        print(f"   Models: {self.settings.models_dir}")
-        print(f"   Output: {self.settings.output_dir}")
-        print(f"   Data:   {self.settings.data_dir}")
-        print()
-        
-        print(f"{Colors.CYAN}🌐 Server Configuration:{Colors.END}")
-        print(f"   Host: {self.settings.host}")
-        print(f"   Port: {self.settings.port}")
-        print(f"   Debug: {self.settings.debug}")
-        print()
-        
-        print(f"{Colors.CYAN}🗃️  Database:{Colors.END}")
-        print(f"   URL: {self.settings.database_url}")
-        print()
-        
-        print(f"{Colors.CYAN}📝 Configuration File:{Colors.END}")
+        # Configuration file info
         config_path = get_config_file_path()
-        if config_path.exists():
-            print(f"   {config_path} {Colors.GREEN}(exists){Colors.END}")
-        else:
-            print(f"   {config_path} {Colors.YELLOW}(using defaults){Colors.END}")
+        config_status = "exists" if config_path.exists() else "using defaults"
+        print(f"{Colors.CYAN}Configuration File:{Colors.END} {config_path} ({config_status})")
+        print()
+        
+        # Show all configuration values in key=value format
+        config_items = [
+            # App info
+            ("app.name", self.settings.app_name),
+            ("app.version", self.settings.app_version),
+            
+            # Storage
+            ("storage.depot_dir", self.settings.depot_dir),
+            ("storage.models_dir", self.settings.models_dir),
+            ("storage.output_dir", self.settings.output_dir),
+            ("storage.data_dir", self.settings.data_dir),
+            ("storage.database_url", self.settings.database_url),
+            ("storage.max_images", self.settings.storage.max_images),
+            ("storage.cleanup_interval", self.settings.storage.cleanup_interval),
+            ("storage.image_retention_days", self.settings.storage.image_retention_days),
+            
+            # Server
+            ("server.host", self.settings.server.host),
+            ("server.port", self.settings.server.port),
+            ("server.debug", self.settings.server.debug),
+            ("server.workers", self.settings.server.workers),
+            ("server.reload", self.settings.server.reload),
+            
+            # Stable Diffusion
+            ("stable_diffusion.model_name", self.settings.stable_diffusion.model_name),
+            ("stable_diffusion.model_path", self.settings.stable_diffusion.model_path),
+            ("stable_diffusion.device", self.settings.stable_diffusion.device),
+            ("stable_diffusion.device_id", self.settings.stable_diffusion.device_id),
+            ("stable_diffusion.precision", self.settings.stable_diffusion.precision),
+            ("stable_diffusion.attention_slicing", self.settings.stable_diffusion.attention_slicing),
+            ("stable_diffusion.memory_efficient_attention", self.settings.stable_diffusion.memory_efficient_attention),
+            ("stable_diffusion.cpu_offload", self.settings.stable_diffusion.cpu_offload),
+            ("stable_diffusion.default_width", self.settings.stable_diffusion.default_width),
+            ("stable_diffusion.default_height", self.settings.stable_diffusion.default_height),
+            ("stable_diffusion.default_steps", self.settings.stable_diffusion.default_steps),
+            ("stable_diffusion.default_cfg_scale", self.settings.stable_diffusion.default_cfg_scale),
+            ("stable_diffusion.default_sampler", self.settings.stable_diffusion.default_sampler),
+            ("stable_diffusion.safety_checker", self.settings.stable_diffusion.safety_checker),
+            ("stable_diffusion.nsfw_filter", self.settings.stable_diffusion.nsfw_filter),
+            
+            # API
+            ("api.rate_limit_requests", self.settings.api.rate_limit_requests),
+            ("api.rate_limit_window", self.settings.api.rate_limit_window),
+            ("api.timeout", self.settings.api.timeout),
+            ("api.max_request_size", self.settings.api.max_request_size),
+            ("api.cors_origins", str(self.settings.api.cors_origins)),
+            ("api.cors_methods", str(self.settings.api.cors_methods)),
+            ("api.cors_headers", str(self.settings.api.cors_headers)),
+            ("api.api_prefix", self.settings.api.api_prefix),
+            
+            # Civitai
+            ("civitai.api_key", self.settings.civitai.api_key or "(not set)"),
+            ("civitai.base_url", self.settings.civitai.base_url),
+            
+            # Proxy
+            ("proxy.http_proxy", self.settings.proxy.http_proxy or "(not set)"),
+            ("proxy.https_proxy", self.settings.proxy.https_proxy or "(not set)"),
+            
+            # Logging
+            ("logging.level", self.settings.logging.level),
+            ("logging.format", self.settings.logging.format),
+            ("logging.file", self.settings.logging.file),
+            ("logging.max_size", self.settings.logging.max_size),
+            ("logging.backup_count", self.settings.logging.backup_count),
+            
+            # Security
+            ("security.api_key_enabled", self.settings.security.api_key_enabled),
+            ("security.api_key", self.settings.security.api_key or "(not set)"),
+            ("security.ssl_enabled", self.settings.security.ssl_enabled),
+            ("security.ssl_cert_file", self.settings.security.ssl_cert_file or "(not set)"),
+            ("security.ssl_key_file", self.settings.security.ssl_key_file or "(not set)"),
+            
+            # Monitoring
+            ("monitoring.health_check_enabled", self.settings.monitoring.health_check_enabled),
+            ("monitoring.metrics_enabled", self.settings.monitoring.metrics_enabled),
+            ("monitoring.metrics_endpoint", self.settings.monitoring.metrics_endpoint),
+            ("monitoring.track_performance", self.settings.monitoring.track_performance),
+            
+            # File
+            ("file.max_file_size", self.settings.file.max_file_size),
+            ("file.allowed_extensions", str(self.settings.file.allowed_extensions)),
+        ]
+        
+        # Calculate max key length for alignment
+        max_key_length = max(len(key) for key, _ in config_items)
+        
+        # Print all configuration items
+        for key, value in config_items:
+            # Format the value
+            if isinstance(value, bool):
+                value_str = f"{Colors.GREEN}true{Colors.END}" if value else f"{Colors.RED}false{Colors.END}"
+            elif isinstance(value, str) and value == "(not set)":
+                value_str = f"{Colors.YELLOW}(not set){Colors.END}"
+            elif isinstance(value, (int, float)):
+                value_str = f"{Colors.BLUE}{value}{Colors.END}"
+            else:
+                value_str = str(value)
+            
+            # Print with alignment
+            print(f"{Colors.CYAN}{key:<{max_key_length}}{Colors.END} = {value_str}")
+        
+        print()
+        print(f"{Colors.YELLOW}💡 Tip:{Colors.END} Use 'sdh config set <key> <value>' to modify configuration values")
     
     def show_config_path(self):
         """Show configuration file path"""
@@ -450,6 +532,139 @@ class SDHostCLI:
             print(f"{Colors.RED}❌ Failed to create configuration file:{Colors.END}")
             print(f"  Error: {e}")
     
+    def get_config_value(self, key: str):
+        """Get a specific configuration value"""
+        try:
+            value = self._get_nested_value(key)
+            if value is None:
+                print(f"{Colors.RED}❌ Configuration key not found:{Colors.END} {key}")
+                return
+            
+            # Format output
+            if isinstance(value, bool):
+                value_str = "true" if value else "false"
+            elif isinstance(value, str) and not value:
+                value_str = "(empty)"
+            else:
+                value_str = str(value)
+            
+            print(f"{Colors.CYAN}{key}{Colors.END} = {value_str}")
+            
+        except Exception as e:
+            print(f"{Colors.RED}❌ Error getting configuration value:{Colors.END}")
+            print(f"  Error: {e}")
+    
+    def set_config_value(self, key: str, value: str):
+        """Set a specific configuration value"""
+        try:
+            # Parse the value to appropriate type
+            parsed_value = self._parse_config_value(key, value)
+            
+            # Set the value in settings
+            success = self._set_nested_value(key, parsed_value)
+            
+            if not success:
+                print(f"{Colors.RED}❌ Invalid configuration key:{Colors.END} {key}")
+                print(f"{Colors.YELLOW}💡 Tip:{Colors.END} Use 'sdh config show' to see available keys")
+                return
+            
+            # Save configuration to file
+            from core.config import save_config
+            save_config(self.settings)
+            
+            print(f"{Colors.GREEN}✅ Configuration updated:{Colors.END}")
+            print(f"  {Colors.CYAN}{key}{Colors.END} = {parsed_value}")
+            print()
+            print(f"{Colors.YELLOW}💡 Note:{Colors.END} Restart the service for changes to take effect")
+            
+        except ValueError as e:
+            print(f"{Colors.RED}❌ Invalid value:{Colors.END} {e}")
+        except Exception as e:
+            print(f"{Colors.RED}❌ Error setting configuration value:{Colors.END}")
+            print(f"  Error: {e}")
+    
+    def _get_nested_value(self, key: str):
+        """Get nested configuration value using dot notation"""
+        parts = key.split('.')
+        current = self.settings
+        
+        for part in parts:
+            if hasattr(current, part):
+                current = getattr(current, part)
+            else:
+                return None
+        
+        return current
+    
+    def _set_nested_value(self, key: str, value) -> bool:
+        """Set nested configuration value using dot notation"""
+        parts = key.split('.')
+        current = self.settings
+        
+        # Navigate to the parent object
+        for part in parts[:-1]:
+            if hasattr(current, part):
+                current = getattr(current, part)
+            else:
+                return False
+        
+        # Set the final value
+        final_key = parts[-1]
+        if hasattr(current, final_key):
+            setattr(current, final_key, value)
+            # Recalculate paths if we modified storage settings
+            if parts[0] == 'storage':
+                self.settings._resolve_paths()
+            return True
+        
+        return False
+    
+    def _parse_config_value(self, key: str, value: str):
+        """Parse string value to appropriate type based on key"""
+        # Get current value to determine type
+        current_value = self._get_nested_value(key)
+        
+        if current_value is None:
+            raise ValueError(f"Unknown configuration key: {key}")
+        
+        # Parse based on current value type
+        if isinstance(current_value, bool):
+            if value.lower() in ('true', '1', 'yes', 'on'):
+                return True
+            elif value.lower() in ('false', '0', 'no', 'off'):
+                return False
+            else:
+                raise ValueError(f"Invalid boolean value: {value}. Use: true/false, 1/0, yes/no, on/off")
+        
+        elif isinstance(current_value, int):
+            try:
+                return int(value)
+            except ValueError:
+                raise ValueError(f"Invalid integer value: {value}")
+        
+        elif isinstance(current_value, float):
+            try:
+                return float(value)
+            except ValueError:
+                raise ValueError(f"Invalid float value: {value}")
+        
+        elif isinstance(current_value, list):
+            # Parse list values (comma-separated)
+            if value.startswith('[') and value.endswith(']'):
+                # JSON-style list
+                import json
+                try:
+                    return json.loads(value)
+                except json.JSONDecodeError:
+                    raise ValueError(f"Invalid list format: {value}")
+            else:
+                # Comma-separated values
+                return [item.strip() for item in value.split(',') if item.strip()]
+        
+        else:
+            # String value
+            return value
+    
     def show_help(self):
         """Show detailed help information"""
         help_text = f"""
@@ -479,9 +694,11 @@ class SDHostCLI:
 {Colors.BOLD}CONFIGURATION:{Colors.END}
     Configuration file: ~/sd-host/config.yml
     
-    sdh config init      - Create initial configuration file
-    sdh config show      - Show current configuration
-    sdh config path      - Show configuration file path
+    sdh config init         - Create initial configuration file
+    sdh config show         - Show all configuration as key-value pairs
+    sdh config get <key>    - Get specific configuration value
+    sdh config set <key> <value> - Set configuration value
+    sdh config path         - Show configuration file path
 
 {Colors.BOLD}SERVICE MANAGEMENT:{Colors.END}
     sdh service status   - Show service status and system info
@@ -512,6 +729,13 @@ class SDHostCLI:
     
     # List models with custom depot
     SDH_DEPOT=/custom/path sdh models list
+    
+    # Configuration management
+    sdh config show                     # Show all settings
+    sdh config get server.port          # Get specific value
+    sdh config set server.port 9000     # Set new value
+    sdh config set server.debug true    # Set boolean value
+    sdh config set api.cors_origins "*,http://localhost:3000"  # Set list
 
 {Colors.BOLD}ENVIRONMENT VARIABLES:{Colors.END}
     SDH_DEPOT            Depot directory path
@@ -564,8 +788,25 @@ def main():
     
     # Config management
     config_parser = subparsers.add_parser("config", help="Configuration management")
-    config_parser.add_argument("action", choices=["show", "path", "init"], 
-                              help="Config action")
+    config_subparsers = config_parser.add_subparsers(dest="config_action", help="Config actions")
+    
+    # Config show
+    config_show_parser = config_subparsers.add_parser("show", help="Show all configuration values")
+    
+    # Config get
+    config_get_parser = config_subparsers.add_parser("get", help="Get specific configuration value")
+    config_get_parser.add_argument("key", help="Configuration key (e.g., server.port)")
+    
+    # Config set
+    config_set_parser = config_subparsers.add_parser("set", help="Set configuration value")
+    config_set_parser.add_argument("key", help="Configuration key (e.g., server.port)")
+    config_set_parser.add_argument("value", help="Configuration value")
+    
+    # Config path
+    config_path_parser = config_subparsers.add_parser("path", help="Show configuration file path")
+    
+    # Config init
+    config_init_parser = config_subparsers.add_parser("init", help="Initialize configuration file")
     
     args = parser.parse_args()
     
@@ -604,12 +845,19 @@ def main():
             cli.show_tasks_status()
     
     elif args.command == "config":
-        if args.action == "show":
+        if args.config_action == "show":
             cli.show_config()
-        elif args.action == "path":
+        elif args.config_action == "get":
+            cli.get_config_value(args.key)
+        elif args.config_action == "set":
+            cli.set_config_value(args.key, args.value)
+        elif args.config_action == "path":
             cli.show_config_path()
-        elif args.action == "init":
+        elif args.config_action == "init":
             cli.init_config()
+        else:
+            # If no subcommand, show help for config
+            config_parser.print_help()
 
 if __name__ == "__main__":
     main()
