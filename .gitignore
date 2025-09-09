@@ -212,3 +212,6 @@ temp/
 *.db
 *.sqlite
 *.sqlite3
+
+# CLI process files
+.sdh.pid
