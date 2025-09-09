@@ -274,7 +274,25 @@ def _parse_config_value(settings, key: str, value: str):
     current_value = _get_nested_value(settings, key)
     
     if current_value is None:
-        raise ValueError(f"Unknown configuration key: {key}")
+        # Check if this is a valid key by checking the config structure
+        parts = key.split('.')
+        current = settings
+        
+        # Navigate to the parent object
+        for part in parts[:-1]:
+            if hasattr(current, part):
+                current = getattr(current, part)
+            else:
+                raise ValueError(f"Unknown configuration key: {key}")
+        
+        # Check if the final attribute exists
+        final_key = parts[-1]
+        if not hasattr(current, final_key):
+            raise ValueError(f"Unknown configuration key: {key}")
+        
+        # For None values (optional fields), treat as string unless we can determine type from the field annotation
+        # This is sufficient for most cases including proxy settings
+        return value
     
     # Parse based on current value type
     if isinstance(current_value, bool):

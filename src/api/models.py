@@ -258,7 +258,7 @@ async def track_civitai_download(
         
         async def generate():
             async for progress_data in civitai_service.get_download_progress(model_hash):
-                yield f"data: {json.dumps(progress_data)}\n\n"
+                yield progress_data
         
         return StreamingResponse(
             generate(),
