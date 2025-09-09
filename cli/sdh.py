@@ -16,8 +16,8 @@ from typing import Dict, List, Optional
 import requests
 from datetime import datetime
 
-# Add src to Python path for imports
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
+# Add src to Python path for imports (CLI is in cli/ subdirectory)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
 class Colors:
     """ANSI color codes for terminal output"""
@@ -34,7 +34,8 @@ class SDHostCLI:
     """SD-Host CLI management tool"""
     
     def __init__(self):
-        self.project_dir = Path(__file__).parent.absolute()
+        # CLI is in cli/ subdirectory, so project root is parent directory
+        self.project_dir = Path(__file__).parent.parent.absolute()
         self.python_exe = self.project_dir / "venv" / "Scripts" / "python.exe"
         self.main_script = self.project_dir / "src" / "main.py"
         self.pid_file = self.project_dir / ".sdh.pid"
