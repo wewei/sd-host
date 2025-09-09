@@ -13,16 +13,22 @@ A cross-platform Python web service that provides RESTful APIs for Stable Diffus
 
 ## Architecture
 
-The project follows a layered architecture design:
+The project follows a layered architecture with service-oriented CLI design:
 
 ```
-api & cli --depends on--> core --depends on--> models
+CLI --HTTP calls--> API --depends on--> Core --depends on--> Models
 ```
 
 - **`models/`**: Data access layer - Database models, ORM, data persistence
-- **`core/`**: Business logic layer - Core functionality, services, domain logic
+- **`core/`**: Business logic layer - Core functionality, services, domain logic  
 - **`api/`**: HTTP interface layer - REST API endpoints, request/response handling
-- **`cli/`**: Command-line interface layer - CLI tools for management and monitoring
+- **`cli/`**: Command-line interface - Makes HTTP calls to API service (no direct code dependencies)
+
+**Key Design Decision**: The CLI communicates with the API service via HTTP requests rather than direct code imports. This ensures:
+- Single point of GPU resource access (prevents conflicts)
+- Consistent business logic execution  
+- Service-oriented architecture benefits
+- Process isolation and safety
 
 For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
