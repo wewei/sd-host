@@ -1,0 +1,12 @@
+#!/bin/bash
+# SD-Host CLI Tool - Unix/Linux/macOS Launcher
+# This script allows you to run 'sdh' from anywhere on Unix-like systems
+
+# Get the directory where this script is located (bin/)
+BIN_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Go to parent directory (project root)
+PROJECT_ROOT="$(dirname "$BIN_DIR")"
+
+# Use the virtual environment Python to run the CLI
+"$PROJECT_ROOT/venv/bin/python" "$PROJECT_ROOT/src/cli/sdh.py" "$@"

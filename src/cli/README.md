@@ -5,31 +5,43 @@ Command-line interface for managing SD-Host service and querying status.
 ## 📁 Directory Structure
 
 ```
-cli/
+src/cli/
 ├── sdh.py      # Main CLI implementation
-├── sdh.bat     # Windows launcher
 └── README.md   # This documentation
+
+bin/
+├── sdh.bat     # Windows launcher
+└── sdh         # Unix/Linux/macOS launcher
 ```
 
 ## 🚀 Usage
 
 ### From Project Root (Recommended)
 ```bash
-# Use the convenience shortcut in project root
+# Windows
 .\sdh.bat service status
 .\sdh.bat models list
+
+# Linux/macOS
+./bin/sdh service status
+./bin/sdh models list
 ```
 
-### From CLI Directory
+### Direct from bin/ Directory
 ```bash
-# Navigate to cli directory first
-cd cli
-.\sdh.bat service status
-.\sdh.bat models list
+# Windows
+.\bin\sdh.bat service status
+
+# Linux/macOS  
+./bin/sdh service status
 ```
 
 ### Global Access
-To use `sdh` from anywhere, add the project root directory to your system PATH environment variable.
+
+To use `sdh` from anywhere:
+
+**Windows**: Add the project root directory to your system PATH environment variable  
+**Linux/macOS**: Add the `bin/` directory to your PATH or create a symlink
 
 ## 📋 Available Commands
 
@@ -61,11 +73,12 @@ The CLI tool is designed with a modular architecture:
 ## 🛠️ Development
 
 The CLI automatically detects the project structure:
-- Project root is determined from CLI location
-- Virtual environment: `../venv/Scripts/python.exe`
-- Main service: `../src/main.py`
-- PID file: `../.sdh.pid`
-- Logs: `../logs/sdh.log`
+
+- Project root is determined from CLI location (src/cli/ → project root)
+- Virtual environment: `../../venv/Scripts/python.exe` (Windows) or `../../venv/bin/python` (Unix)
+- Main service: `../../src/main.py`
+- PID file: `../../.sdh.pid`
+- Logs: `../../logs/sdh.log`
 
 ## 📝 Dependencies
 
