@@ -109,8 +109,7 @@ This design ensures:
 src/
 ├── api/                    # HTTP Interface Layer
 │   ├── main.py            # FastAPI application
-│   ├── models.py          # API route handlers for models
-│   ├── model_actions.py   # API route handlers for model actions
+│   ├── models.py          # API route handlers for models and model actions
 │   └── __init__.py
 ├── cli/                   # CLI Interface Layer
 │   ├── sdh.py            # CLI implementation
