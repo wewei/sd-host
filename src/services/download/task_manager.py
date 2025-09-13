@@ -4,6 +4,7 @@ Task Manager - 处理下载任务的生命周期管理
 
 import asyncio
 import hashlib
+import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
@@ -149,14 +150,49 @@ class TaskManager:
                 session_data["size"] = total_size
                 session_data["progress"] = min(100.0, (downloaded_size / total_size) * 100.0)
             if speed is not None:
-                session_data["speed"] = f"{speed / (1024 * 1024):.1f} MB/s"
+                # speed 是字节/秒，转换为 MB/s
+                speed_mb_s = speed / (1024 * 1024)
+                session_data["speed"] = f"{speed_mb_s:.1f} MB/s"
             if eta_seconds is not None:
                 session_data["eta"] = self._format_eta(eta_seconds)
         
-        # 更新数据库
-        await self.db_ops.update_task_progress(
-            tracking_hash, downloaded_size, total_size, speed, eta_seconds
-        )
+        # 减少数据库更新频率，每5秒或进度变化超过1%时才更新
+        try:
+            should_update_db = False
+            if tracking_hash in self.active_tasks:
+                last_db_update = getattr(self, '_last_db_updates', {}).get(tracking_hash, 0)
+                current_time = time.time()
+                progress_pct = session_data.get("progress", 0)
+                last_progress = getattr(self, '_last_progress', {}).get(tracking_hash, 0)
+                
+                # 每5秒更新一次，或者进度变化超过1%
+                if (current_time - last_db_update > 5) or (abs(progress_pct - last_progress) > 1):
+                    should_update_db = True
+                    if not hasattr(self, '_last_db_updates'):
+                        self._last_db_updates = {}
+                    if not hasattr(self, '_last_progress'):
+                        self._last_progress = {}
+                    self._last_db_updates[tracking_hash] = current_time
+                    self._last_progress[tracking_hash] = progress_pct
+            
+            # 更新数据库（异步且不阻塞）
+            if should_update_db:
+                asyncio.create_task(self._update_db_progress_safe(
+                    tracking_hash, downloaded_size, total_size, speed, eta_seconds
+                ))
+        except Exception as e:
+            print(f"Error in update_task_progress: {e}")
+    
+    async def _update_db_progress_safe(self, tracking_hash: str, downloaded_size: int,
+                                     total_size: int = None, speed: float = None,
+                                     eta_seconds: int = None):
+        """安全地更新数据库进度（不阻塞主进程）"""
+        try:
+            await self.db_ops.update_task_progress(
+                tracking_hash, downloaded_size, total_size, speed, eta_seconds
+            )
+        except Exception as e:
+            print(f"Error updating database progress: {e}")
     
     async def update_task_status(self, tracking_hash: str, status: DownloadStatus):
         """更新任务状态"""

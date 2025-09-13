@@ -22,20 +22,24 @@ class CivitaiApiClient:
             session_config = self._create_session_config()
             proxy_config = self._get_proxy_config()
             
-            url = f"{self.base_url}/api/v1/model-versions/{version_id}"
+            url = f"{self.base_url}/model-versions/{version_id}"
             print(f"Fetching model info from: {url}")
             
             async with aiohttp.ClientSession(**session_config) as session:
                 proxy = proxy_config.get("https", proxy_config.get("http"))
-                async with session.get(url, proxy=proxy) as response:
+                headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                async with session.get(url, proxy=proxy, headers=headers) as response:
                     print(f"CivitAI API response status: {response.status}")
                     
                     if response.status == 200:
-                        data = await response.json()
+                        # 确保正确的编码处理
+                        text = await response.text(encoding='utf-8')
+                        import json
+                        data = json.loads(text)
                         print(f"Successfully fetched model info for version {version_id}")
                         return data
                     else:
-                        error_text = await response.text()
+                        error_text = await response.text(encoding='utf-8')
                         print(f"CivitAI API error: {error_text}")
                         return None
                         

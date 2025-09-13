@@ -16,7 +16,7 @@ from models.entities import Model, ModelTag, Tag, Image
 from models.schemas import (
     ModelResource, ModelListResponse, ModelDetailResponse,
     ModelFilters, PaginationParams, SortParams, FieldsParams,
-    ModelAttributes, ModelRelationships, TagResource, ImageResource,
+    ModelAttributes, ModelListAttributes, ModelListResource, ModelRelationships, TagResource, ImageResource,
     ModelUpdateRequest, ModelBatchUpdateRequest
 )
 
@@ -26,6 +26,43 @@ class ModelService:
     
     def __init__(self, session: AsyncSession):
         self.session = session
+    
+    async def resolve_model_hash(self, hash_or_prefix: str) -> str:
+        """
+        Resolve a model hash from full hash or prefix.
+        
+        Args:
+            hash_or_prefix: Full hash or hash prefix
+            
+        Returns:
+            Full model hash
+            
+        Raises:
+            ValueError: If no model found or multiple models match prefix
+        """
+        # If it's already a full hash (64 characters), return as is
+        if len(hash_or_prefix) == 64:
+            # Verify the model exists
+            query = select(Model.hash).where(Model.hash == hash_or_prefix)
+            result = await self.session.execute(query)
+            if result.scalar_one_or_none():
+                return hash_or_prefix
+            else:
+                raise ValueError(f"Model with hash '{hash_or_prefix}' not found")
+        
+        # Search for models with matching prefix
+        query = select(Model.hash).where(Model.hash.like(f"{hash_or_prefix}%"))
+        result = await self.session.execute(query)
+        matching_hashes = result.scalars().all()
+        
+        if not matching_hashes:
+            raise ValueError(f"No model found with prefix '{hash_or_prefix}'")
+        elif len(matching_hashes) > 1:
+            # Format the matching hashes for display
+            hash_list = ", ".join([h[:16] + "..." for h in matching_hashes])
+            raise ValueError(f"Ambiguous prefix '{hash_or_prefix}' matches {len(matching_hashes)} models: {hash_list}")
+        else:
+            return matching_hashes[0]
     
     async def get_models(
         self,
@@ -53,12 +90,11 @@ class ModelService:
         offset = (pagination.number - 1) * pagination.size
         query = query.offset(offset).limit(pagination.size)
         
-        # Load relationships if needed
-        if not fields or not fields.model:
-            query = query.options(
-                selectinload(Model.tags).selectinload(ModelTag.tag),
-                selectinload(Model.cover_image)
-            )
+        # Load relationships - always load for now to ensure CLI displays work correctly
+        query = query.options(
+            selectinload(Model.tags).selectinload(ModelTag.tag),
+            selectinload(Model.cover_image)
+        )
         
         # Execute query
         result = await self.session.execute(query)
@@ -67,7 +103,7 @@ class ModelService:
         # Convert to response format
         model_resources = []
         for model in models:
-            model_resource = await self._model_to_resource(model, fields)
+            model_resource = await self._model_to_list_resource(model)
             model_resources.append(model_resource)
         
         # Build pagination metadata
@@ -90,9 +126,16 @@ class ModelService:
             links=links
         )
     
-    async def get_model_by_hash(self, model_hash: str) -> Optional[ModelDetailResponse]:
-        """Get single model by hash"""
-        query = select(Model).where(Model.hash == model_hash).options(
+    async def get_model_by_hash(self, model_hash_or_prefix: str) -> Optional[ModelDetailResponse]:
+        """Get single model by hash or prefix"""
+        # Resolve the hash from prefix if needed
+        try:
+            resolved_hash = await self.resolve_model_hash(model_hash_or_prefix)
+        except ValueError:
+            # Let the caller handle the error
+            raise
+        
+        query = select(Model).where(Model.hash == resolved_hash).options(
             selectinload(Model.tags).selectinload(ModelTag.tag),
             selectinload(Model.cover_image)
         )
@@ -196,9 +239,18 @@ class ModelService:
             "failed": failed
         }
     
-    async def delete_model(self, model_hash: str) -> Dict[str, Any]:
-        """Delete a single model"""
-        query = select(Model).where(Model.hash == model_hash)
+    async def delete_model(self, model_hash_or_prefix: str) -> Dict[str, Any]:
+        """Delete a single model by hash or prefix"""
+        # Resolve the hash from prefix if needed
+        try:
+            resolved_hash = await self.resolve_model_hash(model_hash_or_prefix)
+        except ValueError as e:
+            return {
+                "success": False,
+                "message": str(e)
+            }
+        
+        query = select(Model).where(Model.hash == resolved_hash)
         result = await self.session.execute(query)
         model = result.scalar_one_or_none()
         
@@ -213,7 +265,7 @@ class ModelService:
         
         try:
             # Delete model file if exists
-            await self._delete_model_file(model_hash)
+            await self._delete_model_file(resolved_hash)
             
             # Delete from database
             await self.session.delete(model)
@@ -276,20 +328,20 @@ class ModelService:
         if filters.base_model_in:
             conditions.append(Model.base_model.in_(filters.base_model_in))
         
-        # Tag filtering requires joins
-        if filters.tags_any or filters.tags_none:
-            query = query.join(ModelTag, ModelTag.model_hash == Model.hash)
-            query = query.join(Tag, Tag.name == ModelTag.tag_name)
-            
-            if filters.tags_any:
-                conditions.append(Tag.name.in_(filters.tags_any))
-            
-            if filters.tags_none:
-                # Exclude models with these tags
-                subquery = select(ModelTag.model_hash).where(
-                    ModelTag.tag_name.in_(filters.tags_none)
+        # include_tags: AND relationship - model must have ALL specified tags
+        if filters.include_tags:
+            for tag_name in filters.include_tags:
+                tag_subquery = select(ModelTag.model_hash).join(Tag).where(
+                    Tag.name == tag_name
                 )
-                conditions.append(~Model.hash.in_(subquery))
+                conditions.append(Model.hash.in_(tag_subquery))
+        
+        # exclude_tags: OR relationship - exclude models that have ANY of these tags
+        if filters.exclude_tags:
+            exclude_subquery = select(ModelTag.model_hash).join(Tag).where(
+                Tag.name.in_(filters.exclude_tags)
+            )
+            conditions.append(~Model.hash.in_(exclude_subquery))
         
         if conditions:
             query = query.where(and_(*conditions))
@@ -339,25 +391,56 @@ class ModelService:
             updated_at=model.updated_at
         )
         
-        # Build relationships
-        relationships = None
-        if not fields or not fields.model:
-            # Include tags
-            tag_resources = []
-            for model_tag in model.tags:
-                tag_resources.append(TagResource(id=model_tag.tag.name))
-            
-            # Include cover image
-            cover_image = None
-            if model.cover_image:
-                cover_image = ImageResource(id=model.cover_image.hash)
-            
-            relationships = ModelRelationships(
-                tags={"data": tag_resources},
-                cover_image={"data": cover_image}
-            )
+        # Build relationships - always include for CLI compatibility
+        # Include tags
+        tag_resources = []
+        for model_tag in model.tags:
+            tag_resources.append(TagResource(id=model_tag.tag.name))
+        
+        # Include cover image
+        cover_image = None
+        if model.cover_image:
+            cover_image = ImageResource(id=model.cover_image.hash)
+        
+        relationships = ModelRelationships(
+            tags={"data": tag_resources},
+            cover_image={"data": cover_image}
+        )
         
         return ModelResource(
+            id=model.hash,
+            attributes=attributes,
+            relationships=relationships
+        )
+    
+    async def _model_to_list_resource(self, model: Model) -> ModelListResource:
+        """Convert Model entity to ModelListResource (simplified with relationships)"""
+        # Build simplified attributes for list view
+        attributes = ModelListAttributes(
+            name=model.name,
+            model_type=model.model_type,
+            base_model=model.base_model,
+            size=model.size,
+            status="ready",  # Models in database are considered ready
+            created_at=model.created_at,
+            cover_image_hash=model.cover_image.hash if model.cover_image else None
+        )
+        
+        # Build relationships for tag display
+        tag_resources = []
+        for model_tag in model.tags:
+            tag_resources.append(TagResource(id=model_tag.tag.name))
+        
+        cover_image = None
+        if model.cover_image:
+            cover_image = ImageResource(id=model.cover_image.hash)
+        
+        relationships = ModelRelationships(
+            tags={"data": tag_resources},
+            cover_image={"data": cover_image}
+        )
+        
+        return ModelListResource(
             id=model.hash,
             attributes=attributes,
             relationships=relationships
@@ -412,20 +495,26 @@ class ModelService:
         if os.path.exists(model_path):
             os.remove(model_path)
 
-    async def add_tag_to_model(self, model_hash: str, tag_name: str) -> bool:
+    async def add_tag_to_model(self, model_hash_or_prefix: str, tag_name: str) -> bool:
         """
         Add a tag to a model.
         
         Args:
-            model_hash: Hash of the model
+            model_hash_or_prefix: Hash or prefix of the model
             tag_name: Name of the tag to add
             
         Returns:
             bool: True if successful, False if model not found or tag already exists
         """
         try:
+            # Resolve hash from prefix
+            try:
+                resolved_hash = await self.resolve_model_hash(model_hash_or_prefix)
+            except ValueError:
+                return False
+            
             # Check if model exists
-            model_query = select(Model).where(Model.hash == model_hash)
+            model_query = select(Model).where(Model.hash == resolved_hash)
             model_result = await self.session.execute(model_query)
             model = model_result.scalar_one_or_none()
             
@@ -434,7 +523,7 @@ class ModelService:
             
             # Check if tag relationship already exists
             existing_query = select(ModelTag).where(
-                and_(ModelTag.model_hash == model_hash, ModelTag.tag_name == tag_name)
+                and_(ModelTag.model_hash == resolved_hash, ModelTag.tag_name == tag_name)
             )
             existing_result = await self.session.execute(existing_query)
             existing_tag = existing_result.scalar_one_or_none()
@@ -453,7 +542,7 @@ class ModelService:
                 await self.session.flush()
             
             # Create model-tag association
-            model_tag = ModelTag(model_hash=model_hash, tag_name=tag_name)
+            model_tag = ModelTag(model_hash=resolved_hash, tag_name=tag_name)
             self.session.add(model_tag)
             await self.session.commit()
             
@@ -463,20 +552,26 @@ class ModelService:
             await self.session.rollback()
             raise e
 
-    async def remove_tag_from_model(self, model_hash: str, tag_name: str) -> bool:
+    async def remove_tag_from_model(self, model_hash_or_prefix: str, tag_name: str) -> bool:
         """
         Remove a tag from a model.
         
         Args:
-            model_hash: Hash of the model
+            model_hash_or_prefix: Hash or prefix of the model
             tag_name: Name of the tag to remove
             
         Returns:
             bool: True if successful, False if model or tag relationship not found
         """
         try:
+            # Resolve hash from prefix
+            try:
+                resolved_hash = await self.resolve_model_hash(model_hash_or_prefix)
+            except ValueError:
+                return False
+            
             # Check if model exists
-            model_query = select(Model).where(Model.hash == model_hash)
+            model_query = select(Model).where(Model.hash == resolved_hash)
             model_result = await self.session.execute(model_query)
             model = model_result.scalar_one_or_none()
             
@@ -485,7 +580,7 @@ class ModelService:
             
             # Find the tag relationship
             tag_query = select(ModelTag).where(
-                and_(ModelTag.model_hash == model_hash, ModelTag.tag_name == tag_name)
+                and_(ModelTag.model_hash == resolved_hash, ModelTag.tag_name == tag_name)
             )
             tag_result = await self.session.execute(tag_query)
             model_tag = tag_result.scalar_one_or_none()

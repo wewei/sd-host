@@ -82,17 +82,17 @@ class DownloadTaskDatabase:
         """更新任务进度"""
         try:
             update_data = {
-                DownloadTask.downloaded_size: downloaded_size,
-                DownloadTask.resume_position: downloaded_size,
-                DownloadTask.updated_at: datetime.utcnow()
+                "downloaded_size": downloaded_size,
+                "resume_position": downloaded_size,
+                "updated_at": datetime.utcnow()
             }
             
             if total_size is not None:
-                update_data[DownloadTask.total_size] = total_size
+                update_data["total_size"] = total_size
             if speed is not None:
-                update_data[DownloadTask.download_speed] = speed
+                update_data["download_speed"] = speed
             if eta_seconds is not None:
-                update_data[DownloadTask.eta_seconds] = eta_seconds
+                update_data["eta_seconds"] = eta_seconds
             
             stmt = update(DownloadTask).where(DownloadTask.hash == tracking_hash).values(**update_data)
             await self.session.execute(stmt)
@@ -105,8 +105,8 @@ class DownloadTaskDatabase:
         """更新任务状态"""
         try:
             update_data = {
-                DownloadTask.status: status,
-                DownloadTask.updated_at: datetime.utcnow()
+                "status": status,
+                "updated_at": datetime.utcnow()
             }
             
             # 设置特殊时间戳
@@ -114,9 +114,9 @@ class DownloadTaskDatabase:
                 # 检查是否已有started_at
                 existing_task = await self.get_task_by_hash(tracking_hash)
                 if existing_task and not existing_task.started_at:
-                    update_data[DownloadTask.started_at] = datetime.utcnow()
+                    update_data["started_at"] = datetime.utcnow()
             elif status == DownloadStatus.COMPLETED:
-                update_data[DownloadTask.completed_at] = datetime.utcnow()
+                update_data["completed_at"] = datetime.utcnow()
             
             stmt = update(DownloadTask).where(DownloadTask.hash == tracking_hash).values(**update_data)
             await self.session.execute(stmt)

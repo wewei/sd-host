@@ -183,6 +183,22 @@ python -m api.main
 # 获取模型列表
 curl http://localhost:8000/api/models
 
+# 按标签过滤模型列表
+# 获取同时包含 'anime' 和 'realistic' 标签的模型（AND 关系）
+curl "http://localhost:8000/api/models?includeTags=anime&includeTags=realistic"
+
+# 获取不包含 'nsfw' 或 'explicit' 标签的模型（OR 关系）
+curl "http://localhost:8000/api/models?excludeTags=nsfw&excludeTags=explicit"
+
+# 组合过滤：包含 'anime' 标签但不包含 'nsfw' 标签的模型
+curl "http://localhost:8000/api/models?includeTags=anime&excludeTags=nsfw"
+
+# 复杂过滤：同时包含 'disney' 和 'princess' 但排除 'nsfw' 和 'explicit' 的模型
+curl "http://localhost:8000/api/models?includeTags=disney&includeTags=princess&excludeTags=nsfw&excludeTags=explicit"
+
+# 使用逗号分隔的方式（向后兼容）
+curl "http://localhost:8000/api/models?includeTags=disney,princess&excludeTags=nsfw,explicit"
+
 # 添加 Civitai 模型
 curl -X POST http://localhost:8000/api/models/add-from-civitai \
   -H "Content-Type: application/json" \
@@ -190,4 +206,20 @@ curl -X POST http://localhost:8000/api/models/add-from-civitai \
 
 # 查看下载任务
 curl http://localhost:8000/api/models/download-tasks
+
+# 为模型批量添加标签
+curl -X POST http://localhost:8000/api/models/tag \
+  -H "Content-Type: application/json" \
+  -d '[{
+    "entities": ["hash1", "hash2"],
+    "tags": ["anime", "character"]
+  }]'
+
+# 为模型批量移除标签
+curl -X POST http://localhost:8000/api/models/untag \
+  -H "Content-Type: application/json" \
+  -d '[{
+    "entities": ["hash1", "hash2"],
+    "tags": ["nsfw"]
+  }]'
 ```

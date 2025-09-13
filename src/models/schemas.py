@@ -324,6 +324,7 @@ class ModelListResource(BaseModel):
     type: str = "model"
     id: str  # hash
     attributes: ModelListAttributes
+    relationships: Optional[ModelRelationships] = None  # Include relationships for tag display
     
     class Config:
         from_attributes = True
@@ -356,17 +357,33 @@ class ModelFilters(BaseModel):
     name_contains: Optional[str] = Field(None, alias="name[contains]")
     size_gte: Optional[int] = Field(None, alias="size[gte]")
     size_lte: Optional[int] = Field(None, alias="size[lte]")
-    tags_any: Optional[str] = Field(None, alias="tags[any]")  # Comma-separated
-    tags_none: Optional[str] = Field(None, alias="tags[none]")  # Comma-separated
+    include_tags: Optional[List[str]] = Field(None, alias="includeTags")  # JSON API standard - AND relationship
+    exclude_tags: Optional[List[str]] = Field(None, alias="excludeTags")  # JSON API standard - OR relationship
     base_model_in: Optional[str] = Field(None, alias="base_model[in]")  # Comma-separated
     base_model_contains: Optional[str] = Field(None, alias="base_model[contains]")
     
-    @validator("tags_any", "tags_none", "base_model_in", pre=True)
-    def parse_comma_separated(cls, v):
-        """Parse comma-separated values into lists"""
+    @validator("base_model_in", pre=True)
+    def parse_comma_separated_strings(cls, v):
+        """Parse comma-separated values into lists for legacy string fields"""
         if v is None:
             return None
+        if isinstance(v, list):
+            # FastAPI query parameters can come as lists
+            return [item.strip() for item in v if item.strip()]
         if isinstance(v, str):
+            return [tag.strip() for tag in v.split(",") if tag.strip()]
+        return v
+    
+    @validator("include_tags", "exclude_tags", pre=True)
+    def parse_tag_lists(cls, v):
+        """Handle tag lists that can come as arrays or comma-separated strings"""
+        if v is None:
+            return None
+        if isinstance(v, list):
+            # Already a list from FastAPI
+            return [item.strip() for item in v if item.strip()]
+        if isinstance(v, str):
+            # Comma-separated string fallback
             return [tag.strip() for tag in v.split(",") if tag.strip()]
         return v
     

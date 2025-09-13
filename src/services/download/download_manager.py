@@ -81,6 +81,9 @@ class DownloadManager:
             last_update_time = start_time
             hasher = hashlib.sha256()
             
+            # 初始化速度计算相关变量
+            self._last_reported_size = resume_position
+            
             # 如果有已下载的部分，先计算其哈希
             if resume_position > 0:
                 try:
@@ -158,11 +161,23 @@ class DownloadManager:
                             if (current_time - last_update_time).total_seconds() >= 1.0:
                                 if progress_callback:
                                     elapsed = (current_time - start_time).total_seconds()
-                                    speed = (downloaded_size - resume_position) / elapsed if elapsed > 0 else 0
+                                    # 计算实时速度（最近1秒的速度）
+                                    time_diff = (current_time - last_update_time).total_seconds()
+                                    bytes_diff = downloaded_size - getattr(self, '_last_reported_size', resume_position)
+                                    speed = bytes_diff / time_diff if time_diff > 0 else 0
+                                    
+                                    # 记录这次报告的大小，用于下次计算
+                                    self._last_reported_size = downloaded_size
+                                    
                                     eta_seconds = None
                                     if speed > 0:
                                         remaining_bytes = expected_size - downloaded_size
                                         eta_seconds = int(remaining_bytes / speed)
+                                    
+                                    # 添加调试信息
+                                    speed_mb = speed / (1024 * 1024)
+                                    progress_pct = (downloaded_size / expected_size) * 100 if expected_size > 0 else 0
+                                    print(f"Progress: {progress_pct:.1f}%, Speed: {speed_mb:.1f} MB/s, Downloaded: {downloaded_size}/{expected_size}")
                                     
                                     await progress_callback(
                                         downloaded_size=downloaded_size,

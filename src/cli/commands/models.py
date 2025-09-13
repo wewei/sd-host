@@ -23,13 +23,48 @@ def list(
     ctx: typer.Context,
     limit: int = typer.Option(10, "--limit", "-l", help="Number of models to show"),
     model_type: Optional[str] = typer.Option(None, "--type", "-t", help="Filter by model type"),
+    include_tags: Optional[str] = typer.Option(None, "--include-tags", "--tags", "-i", help="Include models with these tags (comma-separated, AND relationship)"),
+    exclude_tags: Optional[str] = typer.Option(None, "--exclude-tags", "-e", help="Exclude models with these tags (comma-separated, OR relationship)"),
 ):
     """List all available models"""
     cli_state = ctx.obj
     
     header("Models List")
     
-    data = _api_request(cli_state, "/api/models")
+    # Show filter information if any filters are applied
+    if include_tags or exclude_tags or model_type:
+        filter_info = "🔍 Active filters: "
+        filters = []
+        if include_tags:
+            filters.append(f"include tags: {include_tags}")
+        if exclude_tags:
+            filters.append(f"exclude tags: {exclude_tags}")
+        if model_type:
+            filters.append(f"type: {model_type}")
+        filter_info += ", ".join(filters)
+        info(filter_info)
+        console.print()
+    
+    # Build query parameters for tag filtering
+    params = {}
+    if include_tags:
+        # Split comma-separated tags and add as multiple parameters
+        tag_list = [tag.strip() for tag in include_tags.split(",") if tag.strip()]
+        for tag in tag_list:
+            if "includeTags" not in params:
+                params["includeTags"] = []
+            params["includeTags"].append(tag)
+    
+    if exclude_tags:
+        # Split comma-separated tags and add as multiple parameters
+        tag_list = [tag.strip() for tag in exclude_tags.split(",") if tag.strip()]
+        for tag in tag_list:
+            if "excludeTags" not in params:
+                params["excludeTags"] = []
+            params["excludeTags"].append(tag)
+    
+    # Make API request with parameters
+    data = _api_request(cli_state, "/api/models", params=params)
     if not data:
         return
     
@@ -49,10 +84,11 @@ def list(
     # Create models table
     table = Table(title=f"Models ({len(models)} of {len(data.get('data', []))})", 
                   show_header=True, header_style="bold cyan")
-    table.add_column("Name", style="white", width=30)
-    table.add_column("Type", style="blue", width=12)
-    table.add_column("Size", style="green", width=10)
-    table.add_column("Status", style="yellow", width=12)
+    table.add_column("Name", style="white", width=25)
+    table.add_column("Type", style="blue", width=10)
+    table.add_column("Size", style="green", width=8)
+    table.add_column("Status", style="yellow", width=10)
+    table.add_column("Tags", style="magenta", width=20)
     table.add_column("Hash", style="dim", width=16)
     
     for model in models:
@@ -62,6 +98,22 @@ def list(
         size = attrs.get("size", 0)
         status = attrs.get("status", "unknown")
         model_hash = model.get("id", "")[:16] + "..."
+        
+        # Extract tags from relationships
+        tags = []
+        relationships = model.get("relationships", {})
+        if relationships and "tags" in relationships:
+            tag_data = relationships["tags"].get("data", [])
+            tags = [tag_info.get("id", "") for tag_info in tag_data if isinstance(tag_info, dict)]
+        
+        # Format tags for display (limit to 3 tags)
+        if tags:
+            if len(tags) > 3:
+                tags_str = f"{', '.join(tags[:3])}..."
+            else:
+                tags_str = ", ".join(tags)
+        else:
+            tags_str = "-"
         
         # Format status with color
         if status == "ready":
@@ -78,6 +130,7 @@ def list(
             model_type_val,
             format_bytes(size),
             status_fmt,
+            tags_str,
             model_hash
         )
     
@@ -165,17 +218,78 @@ def download(
 
 @app.command() 
 def remove(
-    model_hash: str = typer.Argument(..., help="Model hash to remove"),
+    model_hash: str = typer.Argument(..., help="Model hash or hash prefix to remove"),
     ctx: typer.Context = None,
     force: bool = typer.Option(False, "--force", "-f", help="Force removal without confirmation")
 ):
-    """Remove a model (coming soon)"""
+    """Remove a model by hash or hash prefix"""
     if ctx is None:
         ctx = typer.Context(remove)
-    warning("🚧 Model removal feature coming soon...")
-    info(f"Model hash: {model_hash}")
+    
+    cli_state = ctx.obj
+    
+    header("Remove Model")
+    
+    # First, get model details to show what will be removed
+    models_data = _api_request(cli_state, "/api/models")
+    if not models_data:
+        return
+    
+    # Find matching models
+    all_models = models_data.get("data", [])
+    matching_models = []
+    
+    for model in all_models:
+        model_id = model.get("id", "")
+        if model_id.startswith(model_hash):
+            matching_models.append(model)
+    
+    if not matching_models:
+        error(f"❌ No model found with hash or prefix: {model_hash}")
+        return
+    
+    if len(matching_models) > 1:
+        error(f"❌ Ambiguous hash prefix '{model_hash}'. Found {len(matching_models)} matching models:")
+        for model in matching_models:
+            attrs = model.get("attributes", {})
+            console.print(f"  • {attrs.get('name', 'Unknown')} - {model.get('id', '')[:16]}...")
+        info("💡 Please provide a more specific hash prefix")
+        return
+    
+    # Get the exact model to remove
+    model_to_remove = matching_models[0]
+    model_id = model_to_remove.get("id", "")
+    attrs = model_to_remove.get("attributes", {})
+    model_name = attrs.get("name", "Unknown")
+    model_type = attrs.get("model_type", "unknown")
+    size = attrs.get("size", 0)
+    
+    # Show model details
+    info(f"📋 Model to remove:")
+    console.print(f"  Name: {model_name}")
+    console.print(f"  Type: {model_type}")
+    console.print(f"  Size: {format_bytes(size)}")
+    console.print(f"  Hash: {model_id}")
+    console.print()
+    
+    # Confirmation prompt (unless force is used)
+    if not force:
+        confirm = typer.confirm(f"⚠️  Are you sure you want to remove this model? This action cannot be undone.")
+        if not confirm:
+            info("❌ Operation cancelled")
+            return
+    
+    # Make deletion request
+    response = _api_delete_request(cli_state, f"/api/models/{model_id}")
+    if response:
+        if response.get("success", False):
+            success(f"✅ Model '{model_name}' removed successfully")
+        else:
+            error(f"❌ Failed to remove model: {response.get('message', 'Unknown error')}")
+    else:
+        error("❌ Failed to communicate with service")
 
-def _api_request(cli_state: CLIState, endpoint: str) -> Optional[Dict[str, Any]]:
+def _api_request(cli_state: CLIState, endpoint: str, params: Dict[str, Any] = None) -> Optional[Dict[str, Any]]:
     """Make API request to SD-Host service"""
     from .service import _is_service_running
     
@@ -185,7 +299,7 @@ def _api_request(cli_state: CLIState, endpoint: str) -> Optional[Dict[str, Any]]
         return None
     
     try:
-        response = requests.get(f"{cli_state.api_base}{endpoint}", timeout=10)
+        response = requests.get(f"{cli_state.api_base}{endpoint}", params=params, timeout=10)
         if response.status_code == 200:
             return response.json()
         else:
@@ -225,6 +339,29 @@ def _api_post_request(cli_state: CLIState, endpoint: str, data: Dict[str, Any]) 
         response = requests.post(f"{cli_state.api_base}{endpoint}", json=data, timeout=30)
         if response.status_code in [200, 201, 202]:
             return response.json()
+        else:
+            error(f"API request failed: {response.status_code}")
+            if response.text:
+                error(f"Response: {response.text}")
+            return None
+    except requests.exceptions.RequestException as e:
+        error(f"Connection error: {e}")
+        return None
+
+
+def _api_delete_request(cli_state: CLIState, endpoint: str) -> Optional[Dict[str, Any]]:
+    """Make a DELETE request to the API"""
+    from .service import _is_service_running
+    
+    if not _is_service_running(cli_state):
+        error("Service is not running")
+        info("Start the service with: sdh service start")
+        return None
+    
+    try:
+        response = requests.delete(f"{cli_state.api_base}{endpoint}", timeout=30)
+        if response.status_code in [200, 204]:
+            return response.json() if response.content else {"success": True}
         else:
             error(f"API request failed: {response.status_code}")
             if response.text:

@@ -37,8 +37,8 @@ async def get_models(
     name_contains: Optional[str] = Query(None, alias="filter[name][contains]"),
     size_gte: Optional[int] = Query(None, alias="filter[size][gte]"),
     size_lte: Optional[int] = Query(None, alias="filter[size][lte]"),
-    tags_any: Optional[str] = Query(None, alias="filter[tags][any]"),
-    tags_none: Optional[str] = Query(None, alias="filter[tags][none]"),
+    include_tags: Optional[List[str]] = Query(None, alias="includeTags", description="Tags to include (AND relationship)"),
+    exclude_tags: Optional[List[str]] = Query(None, alias="excludeTags", description="Tags to exclude (OR relationship)"),
     base_model_in: Optional[str] = Query(None, alias="filter[base_model][in]"),
     base_model_contains: Optional[str] = Query(None, alias="filter[base_model][contains]"),
     
@@ -62,6 +62,7 @@ async def get_models(
     
     Supports JSON API standard query parameters:
     - Filtering: filter[field]=value, filter[field][operator]=value
+    - Tag filtering: includeTags=tag1,tag2 (AND), excludeTags=tag1,tag2 (OR)
     - Pagination: page[number], page[size]
     - Sorting: sort (prefix with - for descending)
     - Field selection: fields[model]
@@ -75,8 +76,8 @@ async def get_models(
             name_contains=name_contains,
             size_gte=size_gte,
             size_lte=size_lte,
-            tags_any=tags_any,
-            tags_none=tags_none,
+            include_tags=include_tags,
+            exclude_tags=exclude_tags,
             base_model_in=base_model_in,
             base_model_contains=base_model_contains
         )
@@ -87,7 +88,7 @@ async def get_models(
         # Build sort object
         sort_params = SortParams(sort=sort)
         
-        # Build fields object
+        # Build fields object - always include relationships for CLI compatibility
         fields = FieldsParams(model=fields_model) if fields_model else None
         
         # Get models
@@ -347,7 +348,7 @@ async def get_model(
     include: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db)
 ):
-    """Get single model by hash with optional included resources."""
+    """Get single model by hash or hash prefix with optional included resources."""
     try:
         model_service = ModelService(db)
         result = await model_service.get_model_by_hash(model_hash)
@@ -357,6 +358,9 @@ async def get_model(
         
         return result
         
+    except ValueError as e:
+        # Handle prefix resolution errors
+        raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:
         raise
     except Exception as e:
@@ -368,19 +372,26 @@ async def get_model_content(
     model_hash: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """Download model file content directly."""
+    """Download model file content directly by hash or hash prefix."""
     try:
-        # Check if model exists
+        # Check if model exists and resolve hash
         model_service = ModelService(db)
-        model_response = await model_service.get_model_by_hash(model_hash)
+        
+        # First resolve the hash from prefix if needed
+        try:
+            resolved_hash = await model_service.resolve_model_hash(model_hash)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+        
+        model_response = await model_service.get_model_by_hash(resolved_hash)
         
         if not model_response:
             raise HTTPException(status_code=404, detail="Model not found")
         
-        # Check if file exists
+        # Check if file exists (use resolved hash for file path)
         from core.config import get_settings
         settings = get_settings()
-        model_path = os.path.join(settings.models_dir, f"{model_hash}.safetensors")
+        model_path = os.path.join(settings.models_dir, f"{resolved_hash}.safetensors")
         if not os.path.exists(model_path):
             raise HTTPException(status_code=404, detail="Model file not found")
         
@@ -427,7 +438,7 @@ async def delete_model(
     model_hash: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """Delete a single model."""
+    """Delete a single model by hash or hash prefix."""
     try:
         model_service = ModelService(db)
         result = await model_service.delete_model(model_hash)
@@ -435,6 +446,8 @@ async def delete_model(
         if not result["success"]:
             if "not found" in result["message"].lower():
                 raise HTTPException(status_code=404, detail=result["message"])
+            elif "ambiguous" in result["message"].lower():
+                raise HTTPException(status_code=400, detail=result["message"])
             else:
                 raise HTTPException(status_code=400, detail=result["message"])
         
@@ -477,6 +490,7 @@ async def add_model_from_civitai(
     """Add a new model from Civitai."""
     try:
         civitai_service = CivitaiService(db)
+        await civitai_service.initialize_from_database()
         result = await civitai_service.add_model_from_civitai(
             request.model_id, 
             request.version_id
@@ -498,6 +512,7 @@ async def track_civitai_download(
     """SSE endpoint for tracking Civitai download progress."""
     try:
         civitai_service = CivitaiService(db)
+        await civitai_service.initialize_from_database()
         
         async def generate():
             async for progress_data in civitai_service.get_download_progress(model_hash):
