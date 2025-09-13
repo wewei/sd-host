@@ -34,9 +34,48 @@ class BaseModelType(str, Enum):
 
 # JSON API Resource schemas
 class TagResource(BaseModel):
-    """Tag resource representation"""
+    """Tag resource representation (used in relationships)"""
     type: str = "tag"
-    id: str
+    id: str  # tag name
+    
+    class Config:
+        from_attributes = True
+
+
+# Tag Schemas
+class TagAttributes(BaseModel):
+    """Tag attributes for detail view"""
+    name: str
+    description: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class TagDetailResource(BaseModel):
+    """Complete tag resource for detail view"""
+    type: str = "tag"
+    id: str  # tag name
+    attributes: TagAttributes
+    
+    class Config:
+        from_attributes = True
+
+
+class TagListResponse(BaseModel):
+    """Tag list response with simplified format (array of names)"""
+    data: List[str]  # Array of tag names
+    meta: Dict[str, Any] = {}
+    
+    class Config:
+        from_attributes = True
+
+
+class TagDetailResponse(BaseModel):
+    """Single tag response following JSON API specification"""
+    data: TagDetailResource
     
     class Config:
         from_attributes = True

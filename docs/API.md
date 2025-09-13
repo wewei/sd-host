@@ -93,6 +93,16 @@ SD-Host 遵循以下 RESTful API 设计原则，确保 API 的一致性和可预
 | DELETE | `/api/models/download-tasks/completed` | 清理已完成的下载任务 |
 | POST | `/api/models/download-tasks/mock` | 创建测试下载任务（开发模式） |
 
+### 1.4 标签管理
+
+| 方法 | 端点 | 功能描述 |
+|------|------|----------|
+| GET | `/api/tags` | 获取标签名称列表（简洁格式，返回字符串数组） |
+| GET | `/api/tags/{name}` | 获取指定标签详情（包含描述） |
+| POST | `/api/tags/create` | 创建新标签 |
+| POST | `/api/tags/{name}/update` | 更新标签描述 |
+| DELETE | `/api/tags/{name}` | 删除指定标签 |
+
 📖 **详细文档**: [Model Management API](./model-management.md)
 
 ---
