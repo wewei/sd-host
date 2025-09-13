@@ -51,8 +51,186 @@ class ImageResource(BaseModel):
         from_attributes = True
 
 
+# Task Status and Enums
+class TaskStatus(str, Enum):
+    """Task status values"""
+    PENDING = "pending"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+# Task Schemas
+class TaskListAttributes(BaseModel):
+    """Task attributes for list view (simplified form)"""
+    status: TaskStatus
+    prompt: str  # Will be truncated to 100 chars in service layer
+    width: int
+    height: int
+    checkpoint_name: str  # Derived from relationship
+    created_at: datetime
+    completed_at: Optional[datetime] = None
+    image_count: int = 0  # Calculated field
+    
+    class Config:
+        from_attributes = True
+
+
+class TaskAttributes(BaseModel):
+    """Task attributes for detail view (complete form)"""
+    status: TaskStatus
+    prompt: str
+    negative_prompt: str = ""
+    width: int
+    height: int
+    seed: int = -1
+    steps: int = 20
+    cfg_scale: float = 7.0
+    sampler: str = "DPM++ 2M Karras"
+    batch_size: int = 1
+    error_message: Optional[str] = None
+    created_at: datetime
+    promoted_at: datetime
+    completed_at: Optional[datetime] = None
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class TaskRelationships(BaseModel):
+    """Task relationships for JSON API response"""
+    checkpoint: Dict[str, Any] = {"data": None}  # Will contain ModelResource
+    vae: Dict[str, Any] = {"data": None}  # Will contain ModelResource
+    images: Dict[str, List[Any]] = {"data": []}  # Will contain ImageResource
+    additional_models: Dict[str, List[Any]] = {"data": []}  # Will contain ModelResource
+    tags: Dict[str, List[TagResource]] = {"data": []}
+    
+    class Config:
+        from_attributes = True
+
+
+class TaskListResource(BaseModel):
+    """Simplified task resource for list view"""
+    type: str = "task"
+    id: str
+    attributes: TaskListAttributes
+    
+    class Config:
+        from_attributes = True
+
+
+class TaskResource(BaseModel):
+    """Complete task resource for detail view"""
+    type: str = "task"
+    id: str
+    attributes: TaskAttributes
+    relationships: Optional[TaskRelationships] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# Image Schemas
+class ImageListAttributes(BaseModel):
+    """Image attributes for list view (simplified form)"""
+    width: int
+    height: int
+    size: int
+    task_id: Optional[str] = None
+    created_at: datetime
+    thumbnail_url: str  # Computed field
+    
+    class Config:
+        from_attributes = True
+
+
+class ImageAttributes(BaseModel):
+    """Image attributes for detail view (complete form)"""
+    width: int
+    height: int
+    size: int
+    seed: Optional[int] = None
+    task_id: Optional[str] = None
+    created_at: datetime
+    content_url: str  # Computed field
+    thumbnail_url: str  # Computed field
+    
+    class Config:
+        from_attributes = True
+
+
+class ImageRelationships(BaseModel):
+    """Image relationships for JSON API response"""
+    task: Dict[str, Any] = {"data": None}  # Will contain TaskResource
+    tags: Dict[str, List[TagResource]] = {"data": []}
+    
+    class Config:
+        from_attributes = True
+
+
+class ImageListResource(BaseModel):
+    """Simplified image resource for list view"""
+    type: str = "image"
+    id: str
+    attributes: ImageListAttributes
+    
+    class Config:
+        from_attributes = True
+
+
+class ImageDetailResource(BaseModel):
+    """Complete image resource for detail view"""
+    type: str = "image"
+    id: str
+    attributes: ImageAttributes
+    relationships: Optional[ImageRelationships] = None
+    
+    class Config:
+        from_attributes = True
+
+
+# Response Collections
+class TaskListResponse(BaseModel):
+    """Task list response following JSON API specification"""
+    data: List[TaskListResource]
+    meta: Dict[str, Any] = {}
+    links: Dict[str, Any] = {}
+    
+    class Config:
+        from_attributes = True
+
+
+class TaskDetailResponse(BaseModel):
+    """Single task response following JSON API specification"""
+    data: TaskResource
+    included: Optional[List[Any]] = None  # Will contain ModelResource, ImageDetailResource, TagResource
+    
+    class Config:
+        from_attributes = True
+
+
+class ImageListResponse(BaseModel):
+    """Image list response following JSON API specification"""
+    data: List[ImageListResource]
+    meta: Dict[str, Any] = {}
+    links: Dict[str, Any] = {}
+    
+    class Config:
+        from_attributes = True
+
+
+class ImageDetailResponse(BaseModel):
+    """Single image response following JSON API specification"""
+    data: ImageDetailResource
+    included: Optional[List[Any]] = None  # Will contain TaskResource, TagResource
+    
+    class Config:
+        from_attributes = True
+
+
 class ModelAttributes(BaseModel):
-    """Model attributes for JSON API response"""
+    """Model attributes for JSON API response (complete form)"""
     name: str
     model_type: ModelType
     base_model: Optional[str] = None
@@ -68,6 +246,20 @@ class ModelAttributes(BaseModel):
         from_attributes = True
 
 
+class ModelListAttributes(BaseModel):
+    """Model attributes for list view (simplified form)"""
+    name: str
+    model_type: ModelType
+    base_model: Optional[str] = None
+    size: int
+    status: ModelStatus = ModelStatus.READY
+    created_at: datetime
+    cover_image_hash: Optional[str] = None
+    
+    class Config:
+        from_attributes = True
+
+
 class ModelRelationships(BaseModel):
     """Model relationships for JSON API response"""
     tags: Dict[str, List[TagResource]] = {"data": []}
@@ -78,7 +270,7 @@ class ModelRelationships(BaseModel):
 
 
 class ModelResource(BaseModel):
-    """Complete model resource for JSON API response"""
+    """Complete model resource for JSON API response (detail view)"""
     type: str = "model"
     id: str  # hash
     attributes: ModelAttributes
@@ -88,9 +280,19 @@ class ModelResource(BaseModel):
         from_attributes = True
 
 
+class ModelListResource(BaseModel):
+    """Simplified model resource for JSON API response (list view)"""
+    type: str = "model"
+    id: str  # hash
+    attributes: ModelListAttributes
+    
+    class Config:
+        from_attributes = True
+
+
 class ModelListResponse(BaseModel):
     """Model list response following JSON API specification"""
-    data: List[ModelResource]
+    data: List[ModelListResource]
     meta: Dict[str, Any] = {}
     links: Dict[str, Any] = {}
     
@@ -262,20 +464,66 @@ class ErrorResponse(BaseModel):
 
 
 # Download Task Management Schemas
-class DownloadTaskResource(BaseModel):
-    """Download task resource representation"""
-    type: str = "download_task"
-    hash: str
+class DownloadTaskListAttributes(BaseModel):
+    """Download task attributes for list view (simplified form)"""
+    model_name: str
+    model_type: Optional[str] = None
     status: str
     progress: float = 0.0
     speed: str = "0 B/s"
     eta: str = "calculating..."
-    model_name: str = "Unknown"
-    version_name: str = "Unknown"
-    size: int = 0
-    downloaded: int = 0
-    created_at: Optional[str] = None
-    error: Optional[str] = None
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class DownloadTaskAttributes(BaseModel):
+    """Download task attributes for detail view (complete form)"""
+    model_hash: Optional[str] = None
+    model_name: str
+    version_name: Optional[str] = None
+    model_type: Optional[str] = None
+    source_url: str
+    source_type: str = "civitai"
+    status: str
+    total_size: Optional[int] = None
+    downloaded_size: int = 0
+    resume_position: int = 0
+    download_speed: Optional[float] = None
+    eta_seconds: Optional[int] = None
+    temp_file_path: Optional[str] = None
+    final_file_path: Optional[str] = None
+    civitai_model_id: Optional[int] = None
+    civitai_version_id: Optional[int] = None
+    download_metadata: Optional[Dict[str, Any]] = None
+    error_message: Optional[str] = None
+    retry_count: int = 0
+    max_retries: int = 3
+    created_at: datetime
+    updated_at: datetime
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    
+    class Config:
+        from_attributes = True
+
+
+class DownloadTaskListResource(BaseModel):
+    """Simplified download task resource for list view"""
+    type: str = "download_task"
+    id: str  # hash
+    attributes: DownloadTaskListAttributes
+    
+    class Config:
+        from_attributes = True
+
+
+class DownloadTaskResource(BaseModel):
+    """Complete download task resource for detail view"""
+    type: str = "download_task"
+    id: str  # hash
+    attributes: DownloadTaskAttributes
     
     class Config:
         from_attributes = True
@@ -283,13 +531,20 @@ class DownloadTaskResource(BaseModel):
 
 class DownloadTaskListResponse(BaseModel):
     """Response schema for download task list"""
-    data: List[DownloadTaskResource]
+    data: List[DownloadTaskListResource]
     meta: Dict[str, Any] = {}
+    links: Dict[str, Any] = {}
+    
+    class Config:
+        from_attributes = True
 
 
 class DownloadTaskDetailResponse(BaseModel):
     """Response schema for single download task"""
     data: DownloadTaskResource
+    
+    class Config:
+        from_attributes = True
 
 
 class DownloadTaskActionRequest(BaseModel):

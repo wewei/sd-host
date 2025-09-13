@@ -14,6 +14,8 @@ SD-Host 提供了一套完整的 RESTful API 来管理 Stable Diffusion 模型�
 
 📊 **数据库设计文档**: [SQLite 数据库表结构](./database-schema.md)
 
+🎯 **实体响应格式**: [数据实体响应格式定义](./entity-response-formats.md)
+
 ---
 
 ## RESTful API 设计原则
