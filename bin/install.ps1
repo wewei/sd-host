@@ -217,6 +217,69 @@ if ($Uninstall) {
         exit 1
     }
     
+    # Check and create virtual environment if needed
+    $VenvPath = Join-Path $ProjectRoot "venv"
+    if ($Platform -eq "Windows") {
+        $VenvPython = Join-Path $VenvPath "Scripts\python.exe"
+    } else {
+        $VenvPython = Join-Path $VenvPath "bin/python"
+    }
+    
+    if (-not (Test-Path $VenvPython)) {
+        if (-not $Quiet) {
+            Write-Info "Creating virtual environment..."
+        }
+        
+        # Check if Python is available
+        $PythonCmd = $null
+        if (Get-Command python -ErrorAction SilentlyContinue) {
+            $PythonCmd = "python"
+        } elseif (Get-Command python3 -ErrorAction SilentlyContinue) {
+            $PythonCmd = "python3"
+        } else {
+            Write-Error "Python not found. Please install Python first."
+            exit 1
+        }
+        
+        # Create virtual environment
+        try {
+            & $PythonCmd -m venv $VenvPath
+            if ($LASTEXITCODE -ne 0) {
+                Write-Error "Failed to create virtual environment"
+                exit 1
+            }
+            Write-Success "Virtual environment created successfully"
+        } catch {
+            Write-Error "Failed to create virtual environment: $_"
+            exit 1
+        }
+        
+        # Install dependencies
+        if (-not $Quiet) {
+            Write-Info "Installing dependencies..."
+        }
+        
+        $RequirementsPath = Join-Path $ProjectRoot "requirements\requirements.txt"
+        if (Test-Path $RequirementsPath) {
+            try {
+                & $VenvPython -m pip install -r $RequirementsPath
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Warning "Failed to install some dependencies, but continuing..."
+                } else {
+                    Write-Success "Dependencies installed successfully"
+                }
+            } catch {
+                Write-Warning "Failed to install dependencies: $_"
+            }
+        } else {
+            Write-Warning "Requirements file not found: $RequirementsPath"
+        }
+    } else {
+        if (-not $Quiet) {
+            Write-Info "Virtual environment already exists"
+        }
+    }
+    
     # Check if already in PATH
     if (Test-InPath $BinDir) {
         if ($Force) {

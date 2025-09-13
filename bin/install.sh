@@ -201,6 +201,55 @@ else
         exit 1
     fi
     
+    # Check and create virtual environment if needed
+    VENV_PATH="$PROJECT_ROOT/venv"
+    VENV_PYTHON="$VENV_PATH/bin/python"
+    
+    if [ ! -f "$VENV_PYTHON" ]; then
+        if [ "$QUIET" = false ]; then
+            print_info "Creating virtual environment..."
+        fi
+        
+        # Check if Python is available
+        PYTHON_CMD=""
+        if command -v python3 > /dev/null 2>&1; then
+            PYTHON_CMD="python3"
+        elif command -v python > /dev/null 2>&1; then
+            PYTHON_CMD="python"
+        else
+            print_error "Python not found. Please install Python first."
+            exit 1
+        fi
+        
+        # Create virtual environment
+        if "$PYTHON_CMD" -m venv "$VENV_PATH"; then
+            print_success "Virtual environment created successfully"
+        else
+            print_error "Failed to create virtual environment"
+            exit 1
+        fi
+        
+        # Install dependencies
+        if [ "$QUIET" = false ]; then
+            print_info "Installing dependencies..."
+        fi
+        
+        REQUIREMENTS_PATH="$PROJECT_ROOT/requirements/requirements.txt"
+        if [ -f "$REQUIREMENTS_PATH" ]; then
+            if "$VENV_PYTHON" -m pip install -r "$REQUIREMENTS_PATH"; then
+                print_success "Dependencies installed successfully"
+            else
+                print_warning "Failed to install some dependencies, but continuing..."
+            fi
+        else
+            print_warning "Requirements file not found: $REQUIREMENTS_PATH"
+        fi
+    else
+        if [ "$QUIET" = false ]; then
+            print_info "Virtual environment already exists"
+        fi
+    fi
+    
     # Make sure script is executable
     chmod +x "$MAIN_SCRIPT_PATH"
     
