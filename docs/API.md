@@ -102,6 +102,8 @@ SD-Host 遵循以下 RESTful API 设计原则，确保 API 的一致性和可预
 | POST | `/api/tags/create` | 创建新标签 |
 | POST | `/api/tags/{name}/update` | 更新标签描述 |
 | DELETE | `/api/tags/{name}` | 删除指定标签 |
+| POST | `/api/models/tag` | 为模型批量添加标签 |
+| POST | `/api/models/untag` | 为模型批量移除标签 |
 
 📖 **详细文档**: [Model Management API](./model-management.md)
 

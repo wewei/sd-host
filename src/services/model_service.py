@@ -411,3 +411,94 @@ class ModelService:
         model_path = os.path.join(settings.models_dir, f"{model_hash}.safetensors")
         if os.path.exists(model_path):
             os.remove(model_path)
+
+    async def add_tag_to_model(self, model_hash: str, tag_name: str) -> bool:
+        """
+        Add a tag to a model.
+        
+        Args:
+            model_hash: Hash of the model
+            tag_name: Name of the tag to add
+            
+        Returns:
+            bool: True if successful, False if model not found or tag already exists
+        """
+        try:
+            # Check if model exists
+            model_query = select(Model).where(Model.hash == model_hash)
+            model_result = await self.session.execute(model_query)
+            model = model_result.scalar_one_or_none()
+            
+            if not model:
+                return False
+            
+            # Check if tag relationship already exists
+            existing_query = select(ModelTag).where(
+                and_(ModelTag.model_hash == model_hash, ModelTag.tag_name == tag_name)
+            )
+            existing_result = await self.session.execute(existing_query)
+            existing_tag = existing_result.scalar_one_or_none()
+            
+            if existing_tag:
+                return True  # Tag relationship already exists, consider it success
+            
+            # Ensure tag exists, create if not
+            tag_query = select(Tag).where(Tag.name == tag_name)
+            tag_result = await self.session.execute(tag_query)
+            tag = tag_result.scalar_one_or_none()
+            
+            if not tag:
+                tag = Tag(name=tag_name)
+                self.session.add(tag)
+                await self.session.flush()
+            
+            # Create model-tag association
+            model_tag = ModelTag(model_hash=model_hash, tag_name=tag_name)
+            self.session.add(model_tag)
+            await self.session.commit()
+            
+            return True
+            
+        except Exception as e:
+            await self.session.rollback()
+            raise e
+
+    async def remove_tag_from_model(self, model_hash: str, tag_name: str) -> bool:
+        """
+        Remove a tag from a model.
+        
+        Args:
+            model_hash: Hash of the model
+            tag_name: Name of the tag to remove
+            
+        Returns:
+            bool: True if successful, False if model or tag relationship not found
+        """
+        try:
+            # Check if model exists
+            model_query = select(Model).where(Model.hash == model_hash)
+            model_result = await self.session.execute(model_query)
+            model = model_result.scalar_one_or_none()
+            
+            if not model:
+                return False
+            
+            # Find the tag relationship
+            tag_query = select(ModelTag).where(
+                and_(ModelTag.model_hash == model_hash, ModelTag.tag_name == tag_name)
+            )
+            tag_result = await self.session.execute(tag_query)
+            model_tag = tag_result.scalar_one_or_none()
+            
+            if not model_tag:
+                return False  # Tag relationship doesn't exist
+            
+            # Remove the tag relationship
+            await self.session.delete(model_tag)
+            await self.session.commit()
+            
+            return True
+            
+        except Exception as e:
+            await self.session.rollback()
+            raise e

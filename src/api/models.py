@@ -18,6 +18,7 @@ from models.schemas import (
     ModelDeleteRequest, ModelUpdateResponse,
     ModelBatchUpdateResponse, ModelDeleteResponse, ModelBatchDeleteResponse,
     CivitaiAddRequest, CivitaiAddResponse,
+    ModelTagRequest, ModelTagResponse, ModelTagOperationResult,
     DownloadTaskListResponse, DownloadTaskDetailResponse, DownloadTaskResource,
     DownloadTaskActionRequest, DownloadTaskActionResponse,
     DownloadTaskBatchActionRequest, DownloadTaskBatchActionResponse,
@@ -402,7 +403,7 @@ async def get_model_content(
 
 
 
-@router.post("", response_model=ModelBatchUpdateResponse)
+@router.post("/batch-update", response_model=ModelBatchUpdateResponse)
 async def batch_update_models(
     update_data: ModelBatchUpdateRequest,
     db: AsyncSession = Depends(get_db)
@@ -548,5 +549,165 @@ async def get_download_status(
         
     except ValueError as e:
         raise HTTPException(status_code=404, detail="Download not found")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/tag", response_model=ModelTagResponse)
+async def tag_models(
+    request: ModelTagRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Add tags to models.
+    
+    Accepts a list of operations, where each operation contains:
+    - entities: List of model hashes
+    - tags: List of tag names
+    
+    Creates tag relationships for the Cartesian product of entities × tags.
+    """
+    try:
+        model_service = ModelService(db)
+        
+        # Extract operations from request
+        operations = request.root
+        
+        total_operations = 0
+        successful_operations = 0
+        failed_operations = 0
+        results = []
+        
+        # Process each operation
+        for operation in operations:
+            # Create Cartesian product
+            for entity_hash in operation.entities:
+                for tag_name in operation.tags:
+                    total_operations += 1
+                    
+                    try:
+                        # Add tag to model
+                        success = await model_service.add_tag_to_model(entity_hash, tag_name)
+                        
+                        if success:
+                            successful_operations += 1
+                            results.append(ModelTagOperationResult(
+                                entity=entity_hash,
+                                tag=tag_name,
+                                success=True
+                            ))
+                        else:
+                            failed_operations += 1
+                            results.append(ModelTagOperationResult(
+                                entity=entity_hash,
+                                tag=tag_name,
+                                success=False,
+                                message="Model not found"
+                            ))
+                            
+                    except Exception as e:
+                        failed_operations += 1
+                        results.append(ModelTagOperationResult(
+                            entity=entity_hash,
+                            tag=tag_name,
+                            success=False,
+                            message=str(e)
+                        ))
+        
+        # Determine overall success
+        overall_success = failed_operations == 0
+        message = f"Tagged {successful_operations}/{total_operations} model-tag pairs"
+        
+        return ModelTagResponse(
+            success=overall_success,
+            message=message,
+            total_operations=total_operations,
+            successful_operations=successful_operations,
+            failed_operations=failed_operations,
+            results=results
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@router.post("/untag", response_model=ModelTagResponse)
+async def untag_models(
+    request: ModelTagRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Remove tags from models.
+    
+    Accepts a list of operations, where each operation contains:
+    - entities: List of model hashes
+    - tags: List of tag names
+    
+    Removes tag relationships for the Cartesian product of entities × tags.
+    """
+    try:
+        model_service = ModelService(db)
+        
+        # Extract operations from request
+        operations = request.root
+        
+        total_operations = 0
+        successful_operations = 0
+        failed_operations = 0
+        results = []
+        
+        # Process each operation
+        for operation in operations:
+            # Create Cartesian product
+            for entity_hash in operation.entities:
+                for tag_name in operation.tags:
+                    total_operations += 1
+                    
+                    try:
+                        # Remove tag from model
+                        success = await model_service.remove_tag_from_model(entity_hash, tag_name)
+                        
+                        if success:
+                            successful_operations += 1
+                            results.append(ModelTagOperationResult(
+                                entity=entity_hash,
+                                tag=tag_name,
+                                success=True
+                            ))
+                        else:
+                            failed_operations += 1
+                            results.append(ModelTagOperationResult(
+                                entity=entity_hash,
+                                tag=tag_name,
+                                success=False,
+                                message="Model or tag relationship not found"
+                            ))
+                            
+                    except Exception as e:
+                        failed_operations += 1
+                        results.append(ModelTagOperationResult(
+                            entity=entity_hash,
+                            tag=tag_name,
+                            success=False,
+                            message=str(e)
+                        ))
+        
+        # Determine overall success
+        overall_success = failed_operations == 0
+        message = f"Untagged {successful_operations}/{total_operations} model-tag pairs"
+        
+        return ModelTagResponse(
+            success=overall_success,
+            message=message,
+            total_operations=total_operations,
+            successful_operations=successful_operations,
+            failed_operations=failed_operations,
+            results=results
+        )
+        
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal server error")

@@ -2,7 +2,7 @@
 Pydantic schemas for API request/response validation
 """
 
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, validator, RootModel
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 from enum import Enum
@@ -442,6 +442,74 @@ class CivitaiAddRequest(BaseModel):
     """Request schema for adding model from Civitai"""
     model_id: str
     version_id: str
+
+
+# Model Tag Management Schemas
+class ModelTagOperation(BaseModel):
+    """Single tag operation for models"""
+    entities: List[str] = Field(..., min_items=1, description="List of model hashes")
+    tags: List[str] = Field(..., min_items=1, description="List of tag names")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "entities": ["model_hash_1", "model_hash_2"],
+                "tags": ["anime", "realistic"]
+            }
+        }
+
+
+class ModelTagRequest(RootModel[List[ModelTagOperation]]):
+    """Request schema for model tag operations (tag/untag)"""
+    
+    class Config:
+        json_schema_extra = {
+            "example": [
+                {
+                    "entities": ["hash1", "hash2"],
+                    "tags": ["anime", "high-quality"]
+                },
+                {
+                    "entities": ["hash3"],
+                    "tags": ["realistic", "portrait"]
+                }
+            ]
+        }
+
+
+class ModelTagOperationResult(BaseModel):
+    """Result of a single tag operation"""
+    entity: str
+    tag: str
+    success: bool
+    message: Optional[str] = None
+
+
+class ModelTagResponse(BaseModel):
+    """Response schema for model tag operations"""
+    success: bool
+    message: str
+    total_operations: int
+    successful_operations: int
+    failed_operations: int
+    results: List[ModelTagOperationResult] = []
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "message": "Tag operation completed",
+                "total_operations": 4,
+                "successful_operations": 3,
+                "failed_operations": 1,
+                "results": [
+                    {"entity": "hash1", "tag": "anime", "success": True},
+                    {"entity": "hash1", "tag": "realistic", "success": True},
+                    {"entity": "hash2", "tag": "anime", "success": True},
+                    {"entity": "hash2", "tag": "realistic", "success": False, "message": "Tag not found"}
+                ]
+            }
+        }
 
 
 # Response schemas

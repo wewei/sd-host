@@ -12,7 +12,7 @@ import os
 import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
 
-from main import create_app
+from api.main import create_app
 from core.database import db_manager
 
 
@@ -130,7 +130,7 @@ class TestModelAPI:
                 "hash2": {"is_favorite": True}
             }
         }
-        response = client.post("/api/models", json=batch_data)
+        response = client.post("/api/models/batch-update", json=batch_data)
         assert response.status_code == 200
         
         data = response.json()
